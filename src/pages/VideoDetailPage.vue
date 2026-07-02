@@ -66,7 +66,7 @@
   function runtimeForDefaultVersion() {
     const runtime = selectedEpisode.value?.runtime ?? detail.value?.runtime ?? null
     if (!runtime) return null
-    return runtime < 600 ? runtime * 60 : runtime
+    return runtime * 60
   }
 
   function versionQuery() {
@@ -135,11 +135,13 @@
     if (!detail.value || creatingVersion.value) return
     creatingVersion.value = true
 
+    let runtime = runtimeForDefaultVersion()
+
     try {
       const response = await createDefaultVersion({
         video_list_id: detail.value.video_id,
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
-        runtime: runtimeForDefaultVersion(),
+        runtime,
       })
 
       toast.push('默认播放版本已创建', 'success')
@@ -150,7 +152,7 @@
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
         name: '默认',
         description: null,
-        runtime: runtimeForDefaultVersion(),
+        runtime,
       })
     } finally {
       creatingVersion.value = false
@@ -173,12 +175,14 @@
 
     creatingCustomVersion.value = true
 
+    let runtime = runtimeForDefaultVersion()
+
     try {
       const response = await createPlaybackVersion({
         video_list_id: detail.value.video_id,
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
         name,
-        runtime: runtimeForDefaultVersion(),
+        runtime,
       })
 
       toast.push('播放版本已创建', 'success')
@@ -191,7 +195,7 @@
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
         name,
         description: null,
-        runtime: runtimeForDefaultVersion(),
+        runtime,
       })
     } finally {
       creatingCustomVersion.value = false

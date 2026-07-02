@@ -35,11 +35,6 @@ export function formatClockTime(seconds: number | null | undefined) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
 }
 
-export function runtimeToMinutes(seconds: number | null | undefined) {
-  if (seconds === null || seconds === undefined) return ''
-  return `${Math.round(seconds / 60)} 分钟`
-}
-
 export function imageUrl(imagePath: string | null | undefined, size = 'w1080') {
   if (!imagePath) return ''
   const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath
