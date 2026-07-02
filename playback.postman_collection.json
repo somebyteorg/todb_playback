@@ -1,0 +1,623 @@
+{
+  "info": {
+    "_postman_id": "ecd85699-424c-475c-bd32-2549f610f92f",
+    "name": "playback",
+    "description": "所有接口均为 post",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "51442337",
+    "_collection_link": "https://go.postman.co/collection/51442337-ecd85699-424c-475c-bd32-2549f610f92f?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "1.1 通过第三方ID获取 todbv ID",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    // 平台支持 tmdb_id_tv tmdb_id_movie\r\n    \"platform\": \"tmdb_id_tv\",\r\n    \"value\": 278571\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url_playback}}/ids",
+          "host": [
+            "{{url_playback}}"
+          ],
+          "path": [
+            "ids"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "有数据",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"platform\": \"tmdb_id_tv\",\r\n    \"value\": 278573\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/ids",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "ids"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 13:26:29 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"todbv_id\": 1000\n}"
+        },
+        {
+          "name": "无数据",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"platform\": \"tmdb_id_tv\",\r\n    \"value\": 278571\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/ids",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "ids"
+              ]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 13:26:56 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "text/html; charset=utf-8"
+            }
+          ],
+          "cookie": [],
+          "body": null
+        },
+        {
+          "name": "验证错误",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"platform\": \"tmdb_id_tv1\",\r\n    \"value\": 278571\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/ids",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "ids"
+              ]
+            }
+          },
+          "status": "Unprocessable Content",
+          "code": 422,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 13:27:10 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"已选的属性 platform 无效。\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "1.2 搜索视频",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    // 视频类型 tv movie\r\n    \"video_type\": \"tv\",\r\n    // 视频名称 string\r\n    \"title\": null,\r\n    // 上映年份 YYYY int\r\n    \"year\": null,\r\n    // 排序字段 vote_average date_air updated_at\r\n    \"sort_by\": null,\r\n    // 排序方式 asc desc\r\n    \"sort_order\": null,\r\n    \"page\": null,\r\n    \"page_size\": null\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url_playback}}/search",
+          "host": [
+            "{{url_playback}}"
+          ],
+          "path": [
+            "search"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "1.2 搜索视频",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    // 视频类型 tv movie\r\n    \"video_type\": \"tv\",\r\n    // 视频名称 string\r\n    \"title\": null,\r\n    // 上映年份 YYYY int\r\n    \"year\": null,\r\n    // 排序字段 vote_average date_air updated_at\r\n    \"sort_by\": null,\r\n    // 排序方式 asc desc\r\n    \"sort_order\": null,\r\n    \"page\": null,\r\n    \"page_size\": null\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/search",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "search"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "",
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 14:04:13 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [
+            {
+              "expires": "Invalid Date",
+              "domain": "",
+              "path": ""
+            }
+          ],
+          "body": "{\n    \"page\": 1,\n    \"page_size\": 15,\n    \"has_more\": false,\n    \"items\": [\n        {\n            \"video_id\": 1000,\n            \"video_type\": \"tv\",\n            \"video_title\": \"21世纪大君夫人\",\n            \"video_description\": \"欢迎来到21世纪的韩国，一个传统与现代交织的君主立宪制国家。在光鲜亮丽的外表下，隐藏着壁垒分明的社会阶级制度。成熙周，一位才华洋溢的财阀继承人兼首席执行官，似乎拥有一切，但出身平民的她却始终得不到应有的尊重。在诞日宴上与理安大君相遇后，她决心掌握自己的命运。她拥有一切，唯独缺少身份；而他空有尊贵的身份，实际上却一无所有。两人缔结了世纪婚约。他们能否打破社会壁垒，开创属于自己的命运？得到\",\n            \"video_tagline\": \"做好成为大君夫人的准备吧\",\n            \"origin_title\": \"21세기 대군부인\",\n            \"vote_average\": 11,\n            \"vote_count\": 1,\n            \"date_air\": \"2026-04-10\",\n            \"is_adult\": false,\n            \"image_poster\": \"Bxkd23zZPJK1gPNe\"\n        }\n    ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "2.1 获取视频元数据版本",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"todbv_id\": 1000,\r\n    \"season_number\": null,\r\n    \"episode_number\": null\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url_playback}}/version",
+          "host": [
+            "{{url_playback}}"
+          ],
+          "path": [
+            "version"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "2.1 获取视频元数据版本",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"todbv_id\": 1000,\r\n    \"season_number\": null,\r\n    \"episode_number\": null\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/version",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "version"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "",
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 14:09:01 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [
+            {
+              "expires": "Invalid Date",
+              "domain": "",
+              "path": ""
+            }
+          ],
+          "body": "{\n    \"page\": 1,\n    \"page_size\": 15,\n    \"has_more\": false,\n    \"items\": [\n        {\n            \"version_id\": 1007,\n            \"version_name\": \"默认\",\n            \"version_description\": null,\n            \"version_runtime\": 4320,\n            \"season_id\": 1000,\n            \"season_title\": \"第 1 季\",\n            \"season_number\": 1,\n            \"episode_id\": 1001,\n            \"episode_title\": \"你要为了一个虚名而嫁给我？\",\n            \"episode_number\": 2\n        },\n        {\n            \"version_id\": 1008,\n            \"version_name\": \"Netflix 源\",\n            \"version_description\": null,\n            \"version_runtime\": 4320,\n            \"season_id\": 1000,\n            \"season_title\": \"第 1 季\",\n            \"season_number\": 1,\n            \"episode_id\": 1001,\n            \"episode_title\": \"你要为了一个虚名而嫁给我？\",\n            \"episode_number\": 2\n        },\n        {\n            \"version_id\": 1010,\n            \"version_name\": \"默认\",\n            \"version_description\": null,\n            \"version_runtime\": 4500,\n            \"season_id\": 1000,\n            \"season_title\": \"第 1 季\",\n            \"season_number\": 1,\n            \"episode_id\": 1009,\n            \"episode_title\": \"我们一起走到最后吧 我会陪在你身边\",\n            \"episode_number\": 10\n        }\n    ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "2.2 获取视频元数据",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n\t\"version_id\": 1012,\r\n\t\"includes\": [\r\n\t\t\"version\",\r\n\t\t\"marker\",\r\n\t\t\"sprite\"\r\n\t]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url_playback}}/metadata",
+          "host": [
+            "{{url_playback}}"
+          ],
+          "path": [
+            "metadata"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "2.2 获取视频元数据",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\t\"version_id\": 1012,\r\n\t\"includes\": [\r\n\t\t\"version\",\r\n\t\t\"marker\",\r\n\t\t\"sprite\"\r\n\t]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url_playback}}/metadata",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "metadata"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "",
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 15:03:33 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [
+            {
+              "expires": "Invalid Date",
+              "domain": "",
+              "path": ""
+            }
+          ],
+          "body": "{\n    \"version\": {\n        \"version_id\": 1012,\n        \"version_name\": \"默认版本\",\n        \"version_description\": null,\n        \"version_runtime\": 60000\n    },\n    \"marker\": [\n        {\n            \"marker_id\": 1141,\n            \"marker_type\": \"intro\",\n            \"marker_language\": null,\n            \"title\": \"片头\",\n            \"time_start\": 0,\n            \"time_end\": 90,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1142,\n            \"marker_type\": \"credits\",\n            \"marker_language\": null,\n            \"title\": null,\n            \"time_start\": 59910,\n            \"time_end\": 60000,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1143,\n            \"marker_type\": \"advertisement\",\n            \"marker_language\": null,\n            \"title\": \"广告1分钟\",\n            \"time_start\": 853,\n            \"time_end\": 1646,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1144,\n            \"marker_type\": \"chapter\",\n            \"marker_language\": null,\n            \"title\": \"他来了他来了\",\n            \"time_start\": 2279,\n            \"time_end\": null,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1145,\n            \"marker_type\": \"chapter\",\n            \"marker_language\": null,\n            \"title\": \"他走了他走了\",\n            \"time_start\": 3374,\n            \"time_end\": null,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1146,\n            \"marker_type\": \"post_credits\",\n            \"marker_language\": null,\n            \"title\": \"这是彩蛋\",\n            \"time_start\": 12232,\n            \"time_end\": 12966,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        },\n        {\n            \"marker_id\": 1147,\n            \"marker_type\": \"intermission\",\n            \"marker_language\": null,\n            \"title\": \"这是中场休息\",\n            \"time_start\": 7134,\n            \"time_end\": 9607,\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        }\n    ],\n    \"sprite\": [\n        {\n            \"sprite_id\": 1010,\n            \"interval\": 10,\n            \"width\": 160,\n            \"height\": 90,\n            \"columns\": 10,\n            \"rows\": 10,\n            \"count_frame\": 11,\n            \"name\": \"预览图规则1\",\n            \"image_urls\": [\n                \"http://playback.todb/image/LQbk1sFIqc6gOgbKXqrqq287NdSevQm8XY5MZ21Z.jpg\",\n                \"http://playback.todb/image/D637RY02ZOrGbTfGQmZI9veYdCAv8IK5GArVFx1R.jpg\"\n            ],\n            \"user_avatar_url\": null,\n            \"user_nickname\": \"soa\"\n        }\n    ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "3.1 获取用户信息",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{url_playback}}/user/info",
+          "host": [
+            "{{url_playback}}"
+          ],
+          "path": [
+            "user",
+            "info"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "未登录",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{url_playback}}/user/info",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "user",
+                "info"
+              ]
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 15:31:43 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+        },
+        {
+          "name": "获取成功",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{url_playback}}/user/info",
+              "host": [
+                "{{url_playback}}"
+              ],
+              "path": [
+                "user",
+                "info"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Host",
+              "value": "localhost:8000"
+            },
+            {
+              "key": "Connection",
+              "value": "close"
+            },
+            {
+              "key": "X-Powered-By",
+              "value": "PHP/8.5.6"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, private"
+            },
+            {
+              "key": "Date",
+              "value": "Wed, 01 Jul 2026 15:32:47 GMT"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"key_id\": 1009,\n    \"username\": null,\n    \"show_adult\": true\n}"
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{playback_key}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}

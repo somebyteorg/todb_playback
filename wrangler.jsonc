@@ -1,0 +1,63 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "todb-playback",
+  "compatibility_date": "2026-06-28",
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "directory": "./dist"
+  },
+  "observability": {
+    "logs": {
+      "enabled": false
+    },
+    "traces": {
+      "enabled": false
+    }
+  },
+  "routes": [
+    {
+      "pattern": "playback.theotherdb.org/",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/in*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/browse*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/docs*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/keys*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/video*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/workspace*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/favicon.*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/playback_assets/*",
+      "zone_name": "theotherdb.org"
+    },
+    {
+      "pattern": "playback.theotherdb.org/robots.txt",
+      "zone_name": "theotherdb.org"
+    }
+  ]
+}
