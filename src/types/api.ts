@@ -50,35 +50,30 @@ export interface SeasonItem {
   season_id: number
   season_number: number
   season_title: string
-  season_description: string | null
   origin_title: string | null
   date_air: string | null
-  vote_average: number | null
-  vote_count: number | null
-  image_poster: string | null
   episode_count: number
-  is_can_edit?: boolean
 }
 
 export interface EpisodeItem {
+  season_id: number
   episode_id: number
   episode_number: number
   episode_title: string
-  episode_description: string | null
   origin_title: string | null
   runtime: number | null
   date_air: string | null
-  vote_average: number | null
-  vote_count: number | null
-  image_poster: string | null
-  parts_count: number
-  is_can_edit?: boolean
+  playback_versions_count: number
 }
 
-export interface EpisodeDetail extends EpisodeItem {
-  video_id: number
+export interface EpisodeDetail {
   season_id: number
-  is_can_edit: boolean
+  episode_id: number
+  episode_number: number
+  episode_title: string
+  origin_title: string | null
+  runtime: number | null
+  date_air: string | null
 }
 
 export interface PlaybackVersion {

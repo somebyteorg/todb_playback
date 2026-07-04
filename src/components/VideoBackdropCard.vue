@@ -27,9 +27,7 @@
         <p v-if="video.origin_title" class="mt-1 line-clamp-1 text-sm text-white/80">{{ video.origin_title }}</p>
         <p v-if="video.tagline" class="mt-1 line-clamp-1 text-sm text-white/70">{{ video.tagline }}</p>
       </div>
-      <span v-if="video.runtime" class="shrink-0 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink">
-        {{ video.runtime }} 分钟
-      </span>
+      <span v-if="video.runtime" class="shrink-0 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink"> {{ video.runtime }} 分钟 </span>
     </div>
     <p v-if="bottomMeta" class="absolute bottom-4 left-4 right-4 line-clamp-1 text-sm text-white/85">
       {{ bottomMeta }}

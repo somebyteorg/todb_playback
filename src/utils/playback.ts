@@ -36,11 +36,15 @@ export function getVideoDetail(videoId: number) {
 }
 
 export function listSeasons(videoId: number) {
-  return apiJson<SeasonItem[]>(`api/video/${videoId}/season/all`)
+  return apiJson<SeasonItem[]>(`api/playback/video/${videoId}/seasonAll`)
 }
 
-export function listEpisodes(videoId: number, seasonNumber: number) {
-  return apiJson<EpisodeItem[]>(`api/video/${videoId}/season/${seasonNumber}/episode/all`)
+export function listEpisodes(videoId: number, videoSeasonId: number) {
+  return apiJson<EpisodeItem[]>(`api/playback/video/${videoId}/episodeAll`, {
+    searchParams: cleanSearchParams({
+      video_season_id: videoSeasonId,
+    }),
+  })
 }
 
 export function getEpisodeDetail(videoId: number, seasonNumber: number, episodeNumber: number) {

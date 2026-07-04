@@ -1,8 +1,12 @@
 <script setup lang="ts">
+  import dayjs from 'dayjs'
   import { computed, onMounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { CalendarDays, Clapperboard, Loader2, LogIn, Play, Plus, Tv, X } from '@lucide/vue'
+  import { CalendarDays, Clapperboard, Loader2, Tv, X } from '@lucide/vue'
   import ClearableInput from '@/components/ClearableInput.vue'
+  import EpisodeFilterControls from '@/components/EpisodeFilterControls.vue'
+  import Tooltip from '@/components/Tooltip.vue'
+  import VersionListPanel from '@/components/VersionListPanel.vue'
   import { useSignStore } from '@/stores/sign'
   import { useToastStore } from '@/stores/toast'
   import { ToSign } from '@/utils/api.ts'
@@ -32,16 +36,27 @@
   const autoEntering = ref(false)
   const showCreateDialog = ref(false)
   const customVersionName = ref('')
+  const onlyShowVersionedEpisodes = ref(false)
+  const onlyShowReleasedEpisodes = ref(true)
+  const versionDockOpen = ref(false)
 
   const selectedSeason = computed(() => seasons.value.find((item) => item.season_id === selectedSeasonId.value) ?? null)
   const selectedEpisode = computed(() => episodes.value.find((item) => item.episode_id === selectedEpisodeId.value) ?? null)
+  const filteredEpisodes = computed(() => episodes.value.filter((episode) => episodeMatchesFilters(episode)))
   const backdrop = computed(() => imageUrl(detail.value?.image_backdrop, 'w780'))
   const poster = computed(() => imageUrl(detail.value?.image_poster, 'w500'))
   const contextReady = computed(() => {
     if (!detail.value) return false
     return detail.value.video_type === 'movie' || Boolean(selectedEpisode.value)
   })
-  const hasVersions = computed(() => versions.value.length > 0)
+  const showVersionDock = computed(() => detail.value?.video_type === 'tv' && versionDockOpen.value && contextReady.value)
+  const versionPanelDescription = computed(() => {
+    if (selectedEpisode.value) {
+      return `第 ${selectedEpisode.value.episode_number} 集 · ${selectedEpisode.value.episode_title}`
+    }
+
+    return '只有当播放时长不同的时候，才需要创建新版本。'
+  })
 
   function routeNumber(value: unknown) {
     const raw = Array.isArray(value) ? value[0] : value
@@ -60,7 +75,58 @@
   }
 
   function hasEpisodeMeta(episode: EpisodeItem) {
-    return episode.date_air || episode.runtime
+    return Boolean(episode.date_air || episode.runtime)
+  }
+
+  function episodeHasVersions(episode: EpisodeItem) {
+    return episode.playback_versions_count > 0
+  }
+
+  function episodeHasReleased(episode: EpisodeItem) {
+    if (!episode.date_air) return false
+
+    const airDate = dayjs(episode.date_air)
+    return airDate.isValid() && !airDate.isAfter(dayjs(), 'day')
+  }
+
+  function episodeVersionText(episode: EpisodeItem) {
+    return episodeHasVersions(episode) ? `${episode.playback_versions_count} 个版本` : '无版本'
+  }
+
+  function episodeMatchesReleaseFilter(episode: EpisodeItem) {
+    return episodeHasReleased(episode) || episodeHasVersions(episode)
+  }
+
+  function episodeMatchesFilters(episode: EpisodeItem) {
+    if (onlyShowVersionedEpisodes.value && !episodeHasVersions(episode)) return false
+    if (onlyShowReleasedEpisodes.value && !episodeMatchesReleaseFilter(episode)) return false
+    return true
+  }
+
+  function clearSelectedEpisode() {
+    selectedEpisodeId.value = null
+    versions.value = []
+    versionDockOpen.value = false
+  }
+
+  function syncSelectedEpisodeWithFilters() {
+    if (selectedEpisode.value && !episodeMatchesFilters(selectedEpisode.value)) {
+      clearSelectedEpisode()
+    }
+  }
+
+  function toggleVersionedEpisodesFilter() {
+    onlyShowVersionedEpisodes.value = !onlyShowVersionedEpisodes.value
+    syncSelectedEpisodeWithFilters()
+  }
+
+  function toggleReleasedEpisodesFilter() {
+    onlyShowReleasedEpisodes.value = !onlyShowReleasedEpisodes.value
+    syncSelectedEpisodeWithFilters()
+  }
+
+  function closeVersionDock() {
+    versionDockOpen.value = false
   }
 
   function runtimeForDefaultVersion() {
@@ -111,6 +177,7 @@
   async function chooseEpisode(episode: EpisodeItem) {
     selectedEpisodeId.value = episode.episode_id
     versions.value = []
+    versionDockOpen.value = true
     await loadVersionList()
   }
 
@@ -118,13 +185,16 @@
     selectedSeasonId.value = season.season_id
     selectedEpisodeId.value = null
     versions.value = []
+    versionDockOpen.value = false
     episodeLoading.value = true
 
     try {
-      episodes.value = await listEpisodes(videoId.value, season.season_number)
+      episodes.value = await listEpisodes(videoId.value, season.season_id)
       const initialEpisode = initialEpisodeNumber !== null && initialEpisodeNumber !== undefined ? episodes.value.find((item) => item.episode_number === initialEpisodeNumber) : null
       if (initialEpisode) {
-        await chooseEpisode(initialEpisode)
+        if (episodeMatchesFilters(initialEpisode)) {
+          await chooseEpisode(initialEpisode)
+        }
       }
     } finally {
       episodeLoading.value = false
@@ -219,6 +289,7 @@
       detail.value = await getVideoDetail(videoId.value)
 
       if (detail.value.video_type === 'movie') {
+        versionDockOpen.value = false
         await loadVersionList()
         return
       }
@@ -235,6 +306,7 @@
     } finally {
       loading.value = false
       seasonLoading.value = false
+      episodeLoading.value = false
     }
   }
 
@@ -249,7 +321,7 @@
       <Loader2 :size="32" class="animate-spin text-primary" />
     </section>
 
-    <section v-else-if="detail" class="relative isolate pb-12">
+    <section v-else-if="detail" class="relative isolate" :class="showVersionDock ? 'pb-64 md:pb-56' : 'pb-12'">
       <img v-if="backdrop" :src="backdrop" :alt="detail.video_title" class="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover" />
       <div class="pointer-events-none fixed inset-0 z-0 bg-gradient-to-b from-page/15 via-page/70 to-page/100" />
 
@@ -281,8 +353,8 @@
       </div>
 
       <div class="relative z-10 mx-auto max-w-6xl space-y-6 px-5 md:px-8" :class="detail.video_type === 'tv' ? 'py-2 md:py-3' : 'py-5 md:py-6'">
-        <section v-if="detail.video_type === 'tv'" class="grid gap-5 lg:grid-cols-[280px_1fr]">
-          <div class="panel p-4">
+        <section v-if="detail.video_type === 'tv'" class="grid gap-5 lg:grid-cols-[280px_1fr] lg:items-start">
+          <div class="panel p-4 lg:sticky lg:top-6 lg:self-start">
             <div class="mb-4 flex items-center gap-2 font-semibold text-ink">
               <Tv :size="18" />
               选择季
@@ -300,31 +372,55 @@
                 @click="chooseSeason(season)"
               >
                 <span class="font-semibold text-ink">{{ season.season_title }}</span>
-                <span class="mt-1 block text-xs text-ink/55">{{ season.episode_count }} 集</span>
+                <span v-if="season.origin_title" class="mt-1 block line-clamp-1 text-xs text-ink/45">{{ season.origin_title }}</span>
+                <span class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/55">
+                  <span>{{ season.episode_count }} 集</span>
+                  <span v-if="season.date_air" class="text-ink/30">/</span>
+                  <span v-if="season.date_air">{{ formatDate(season.date_air) }}</span>
+                </span>
               </button>
             </div>
           </div>
 
           <div class="panel p-4">
-            <div class="mb-4 flex items-center gap-2 font-semibold text-ink">
-              <Clapperboard :size="18" />
-              选择集
+            <div class="mb-4 flex flex-wrap items-center gap-3">
+              <div class="flex min-h-8 items-center gap-2 font-semibold text-ink">
+                <Clapperboard :size="18" />
+                选择集
+              </div>
+              <EpisodeFilterControls
+                v-if="selectedSeason && !episodeLoading && episodes.length > 0"
+                :versioned-only="onlyShowVersionedEpisodes"
+                :released-only="onlyShowReleasedEpisodes"
+                @toggle-versioned="toggleVersionedEpisodesFilter"
+                @toggle-released="toggleReleasedEpisodesFilter"
+              />
             </div>
             <div v-if="!selectedSeason" class="empty-box">先选择季。</div>
             <div v-else-if="episodeLoading" class="grid h-32 place-items-center text-ink/55">
               <Loader2 :size="24" class="animate-spin" />
             </div>
+            <div v-else-if="episodes.length === 0" class="empty-box">当前季暂无剧集。</div>
+            <div v-else-if="filteredEpisodes.length === 0" class="empty-box">当前筛选下暂无剧集。</div>
             <div v-else class="grid gap-3 md:grid-cols-2">
               <button
-                v-for="episode in episodes"
+                v-for="episode in filteredEpisodes"
                 :key="episode.episode_id"
                 type="button"
                 class="rounded-2xl border p-4 text-left transition"
                 :class="selectedEpisodeId === episode.episode_id ? 'border-primary bg-primary/10' : 'border-line bg-panel hover:border-primary/40'"
                 @click="chooseEpisode(episode)"
               >
-                <span class="text-xs font-semibold text-primary">第 {{ episode.episode_number }} 集</span>
-                <h3 class="mt-2 line-clamp-1 font-semibold text-ink">{{ episode.episode_title }}</h3>
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-xs font-semibold text-primary">第 {{ episode.episode_number }} 集</span>
+                  <Tooltip :text="episodeVersionText(episode)" placement="left">
+                    <span class="mt-1 block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/70 dark:ring-black/30" :class="episodeHasVersions(episode) ? 'bg-emerald-500' : 'bg-rose-400'" />
+                  </Tooltip>
+                </div>
+                <Tooltip :text="episode.episode_title" as="div" placement="bottom" overflow-only class="mt-2 w-full min-w-0">
+                  <h3 class="line-clamp-1 w-full min-w-0 font-semibold text-ink">{{ episode.episode_title }}</h3>
+                </Tooltip>
+                <p v-if="episode.origin_title" class="mt-1 line-clamp-1 text-xs text-ink/45">{{ episode.origin_title }}</p>
                 <p v-if="hasEpisodeMeta(episode)" class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/55">
                   <template v-for="(meta, index) in episodeMeta(episode)" :key="meta">
                     <span v-if="index > 0" class="text-ink/30">/</span>
@@ -336,55 +432,41 @@
           </div>
         </section>
 
-        <section class="panel p-5">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 class="text-xl font-semibold text-ink">版本列表</h2>
-              <p class="mt-1 text-sm text-ink/60">只有当播放时长不同的时候，才需要创建新版本。</p>
-            </div>
-            <button v-if="contextReady && sign.isSignedIn && !hasVersions" type="button" class="btn-primary" :disabled="creatingVersion || versionLoading" @click="enterDefaultVersion">
-              <Loader2 v-if="creatingVersion" :size="17" class="animate-spin" />
-              <Plus v-else :size="17" />
-              创建默认版本
-            </button>
-            <button v-else-if="contextReady && sign.isSignedIn && hasVersions" type="button" class="btn-secondary" :disabled="versionLoading" @click="openCreateDialog">
-              <Plus :size="17" />
-              创建新版本
-            </button>
-          </div>
-
-          <div v-if="!contextReady" class="empty-box mt-5">先选择具体的电影或剧集。</div>
-          <div v-else-if="versionLoading" class="grid h-32 place-items-center text-ink/55">
-            <Loader2 :size="24" class="animate-spin" />
-          </div>
-          <div v-else-if="versions.length === 0" class="mt-5 rounded-2xl border border-dashed border-line p-6 text-center text-ink/60">
-            <p>当前还没有播放版本。</p>
-            <button v-if="!sign.isSignedIn" type="button" class="btn-primary mx-auto mt-4" @click="ToSign">
-              <LogIn :size="17" />
-              登录后创建默认版本
-            </button>
-          </div>
-          <div v-else class="mt-5 space-y-3">
-            <button
-              v-for="version in versions"
-              :key="version.version_id"
-              type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-2xl border border-line bg-muted px-4 py-3 text-left transition hover:border-primary/45"
-              @click="enterWorkspace(version)"
-            >
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="font-semibold text-ink">{{ version.name }}</h3>
-                  <span v-if="version.runtime" class="text-xs text-ink/55">{{ formatDuration(version.runtime) }}</span>
-                </div>
-                <p v-if="version.description" class="mt-1 line-clamp-1 text-sm text-ink/60">{{ version.description }}</p>
-              </div>
-              <Play :size="17" class="shrink-0 text-primary" />
-            </button>
-          </div>
-        </section>
+        <VersionListPanel
+          v-if="detail.video_type === 'movie'"
+          :description="versionPanelDescription"
+          :versions="versions"
+          :loading="versionLoading"
+          :can-create="sign.isSignedIn"
+          :creating-default="creatingVersion"
+          @create-default="enterDefaultVersion"
+          @create-custom="openCreateDialog"
+          @enter="enterWorkspace"
+          @sign-in="ToSign"
+        />
       </div>
     </section>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <section v-if="showVersionDock" class="fixed inset-x-0 bottom-0 z-30 px-4 pb-4 md:px-8">
+          <VersionListPanel
+            mode="dock"
+            :description="versionPanelDescription"
+            :versions="versions"
+            :loading="versionLoading"
+            :can-create="sign.isSignedIn"
+            :can-close="true"
+            :creating-default="creatingVersion"
+            @create-default="enterDefaultVersion"
+            @create-custom="openCreateDialog"
+            @close="closeVersionDock"
+            @enter="enterWorkspace"
+            @sign-in="ToSign"
+          />
+        </section>
+      </Transition>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="fade">

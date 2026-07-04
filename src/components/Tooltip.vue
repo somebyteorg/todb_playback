@@ -4,12 +4,16 @@
   const props = withDefaults(
     defineProps<{
       text: string
+      as?: 'span' | 'div'
       placement?: 'top' | 'bottom' | 'left' | 'right'
       offset?: number
+      overflowOnly?: boolean
     }>(),
     {
+      as: 'span',
       placement: 'top',
       offset: 10,
+      overflowOnly: false,
     },
   )
 
@@ -94,7 +98,27 @@
     listenersAttached.value = false
   }
 
+  function hasOverflow(element: HTMLElement): boolean {
+    if (element.scrollWidth - element.clientWidth > 1 || element.scrollHeight - element.clientHeight > 1) {
+      return true
+    }
+
+    return Array.from(element.children).some((child) => child instanceof HTMLElement && hasOverflow(child))
+  }
+
+  function canShowTooltip() {
+    if (!props.overflowOnly) return true
+    if (!anchor.value) return false
+
+    return hasOverflow(anchor.value)
+  }
+
   function show() {
+    if (!canShowTooltip()) {
+      open.value = false
+      return
+    }
+
     if (hideTimer.value !== null) {
       window.clearTimeout(hideTimer.value)
       hideTimer.value = null
@@ -128,7 +152,7 @@
 </script>
 
 <template>
-  <span ref="anchor" class="inline-flex" @pointerenter="show" @pointerleave="hide" @focusin="show" @focusout="hide">
+  <component :is="props.as" ref="anchor" class="inline-flex" @pointerenter="show" @pointerleave="hide" @focusin="show" @focusout="hide">
     <slot />
 
     <Teleport to="body">
@@ -147,7 +171,7 @@
         </div>
       </Transition>
     </Teleport>
-  </span>
+  </component>
 </template>
 
 <style scoped>
