@@ -21,35 +21,17 @@
   const spritePlans = [
     {
       name: '免费',
-      resolution: '160×90',
-      priceValue: '免费',
-      priceUnit: '',
+      resolution: '< 640×360',
+      access: '无需登录',
       toneClass: 'bg-muted text-ink/62 ring-line',
       markerClass: 'bg-ink/30',
     },
     {
-      name: '登录用户',
-      resolution: '240×135',
-      priceValue: '免费',
-      priceUnit: '',
-      toneClass: 'bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-200',
-      markerClass: 'bg-sky-500',
-    },
-    {
       name: 'Plus',
-      resolution: '320×180',
-      priceValue: '1000',
-      priceUnit: '🥕/月',
+      resolution: '>= 640×360',
+      access: '1000 🥕/月',
       toneClass: 'bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-200',
       markerClass: 'bg-amber-500',
-    },
-    {
-      name: 'Pro',
-      resolution: '640×360',
-      priceValue: '3000',
-      priceUnit: '🥕/月',
-      toneClass: 'bg-violet-500/10 text-violet-700 ring-violet-500/25 dark:text-violet-200',
-      markerClass: 'bg-violet-500',
     },
   ]
 
@@ -119,26 +101,20 @@
                 雪碧图权益
               </div>
               <h2 id="sprite-plan-title" class="mt-3 text-xl font-black text-ink md:text-2xl">按账户权益返回可用尺寸</h2>
-              <p class="mt-2 max-w-2xl text-sm leading-6 text-ink/58">匿名可用基础尺寸；携带播放密钥后按套餐等级解锁。</p>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-ink/58">不论是否携带播放密钥，640×360 以下尺寸均可免费使用。</p>
             </div>
           </div>
         </div>
-        <div class="grid md:grid-cols-4">
+        <div class="grid md:grid-cols-2">
           <article v-for="plan in spritePlans" :key="plan.name" class="relative min-w-0 border-t border-line p-5 transition hover:bg-muted/35 md:border-l md:border-t-0 md:first:border-l-0">
             <span class="absolute inset-x-0 top-0 h-1" :class="plan.markerClass" aria-hidden="true" />
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <h3 class="text-sm font-black text-ink">{{ plan.name }}</h3>
               </div>
+              <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1" :class="plan.toneClass">{{ plan.access }}</span>
             </div>
             <p class="mt-5 text-3xl font-black leading-none text-ink">{{ plan.resolution }}</p>
-            <div class="mt-4 rounded-2xl bg-muted/60 px-3 py-3 ring-1 ring-line/70">
-              <p class="text-xs font-black text-ink/42">费用</p>
-              <div class="mt-1 flex min-h-8 items-baseline gap-1.5 whitespace-nowrap">
-                <span class="text-2xl font-black leading-none text-ink">{{ plan.priceValue }}</span>
-                <span v-if="plan.priceUnit" class="text-xs font-bold text-ink/52">{{ plan.priceUnit }}</span>
-              </div>
-            </div>
           </article>
         </div>
       </section>
