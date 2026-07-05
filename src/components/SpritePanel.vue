@@ -41,13 +41,12 @@
     emit('refresh')
   }
 
-  function avatarLabel(sprite: SpriteWithImages) {
-    return (sprite.user_nickname || '用户').slice(0, 1).toUpperCase()
+  function hasUploaderInfo(sprite: SpriteWithImages) {
+    return Boolean(sprite.user_avatar || sprite.user_nickname)
   }
 
-  function uploaderName(sprite: SpriteWithImages) {
-    if (sprite.is_self) return sprite.user_nickname || '自己'
-    return sprite.user_nickname || '其他用户'
+  function userAvatarAlt(sprite: SpriteWithImages) {
+    return sprite.user_nickname || '用户头像'
   }
 
   async function openSpriteViewer(sprite: SpriteWithImages) {
@@ -157,12 +156,9 @@
           <h3 class="break-words font-semibold text-ink">{{ sprite.sprite_id }} # {{ sprite.sprite_name }}</h3>
           <p class="mt-1 text-sm text-ink/60">{{ sprite.interval }}s / {{ sprite.width }}x{{ sprite.height }} / {{ sprite.columns }}x{{ sprite.rows }} / {{ sprite.count_frame }} 帧</p>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-ink/55">
-            <span class="inline-flex items-center gap-1.5">
-              <img v-if="sprite.user_avatar" :src="sprite.user_avatar" :alt="uploaderName(sprite)" class="h-6 w-6 rounded-full border border-line object-cover" />
-              <span v-else class="grid h-6 w-6 place-items-center rounded-full bg-primary/12 text-[11px] font-bold text-primary-strong">
-                {{ avatarLabel(sprite) }}
-              </span>
-              <span>{{ uploaderName(sprite) }}</span>
+            <span v-if="hasUploaderInfo(sprite)" class="inline-flex items-center gap-1.5">
+              <img v-if="sprite.user_avatar" :src="sprite.user_avatar" :alt="userAvatarAlt(sprite)" class="h-6 w-6 rounded-full border border-line object-cover" />
+              <span v-if="sprite.user_nickname">{{ sprite.user_nickname }}</span>
             </span>
             <span>上传时间 {{ formatDateTime(sprite.created_at) || '-' }}</span>
           </div>

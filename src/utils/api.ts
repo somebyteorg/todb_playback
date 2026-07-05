@@ -16,6 +16,10 @@ export function cleanSearchParams(params: Record<string, SearchValue>) {
 }
 
 async function errorMessage(error: unknown, silentStatuses: number[] = []) {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return null
+  }
+
   if (error instanceof HTTPError) {
     if (silentStatuses.includes(error.response.status)) {
       return null

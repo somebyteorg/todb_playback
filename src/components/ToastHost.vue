@@ -7,7 +7,7 @@
 
 <template>
   <Teleport to="body">
-    <div class="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
+    <div class="pointer-events-none fixed right-4 top-4 z-[90] flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
       <TransitionGroup name="toast">
         <div v-for="item in toast.items" :key="item.id" class="pointer-events-auto flex items-start gap-3 rounded-2xl border border-line bg-panel/95 p-4 text-sm shadow-soft backdrop-blur">
           <CheckCircle2 v-if="item.type === 'success'" class="mt-0.5 shrink-0 text-emerald-500" :size="20" />

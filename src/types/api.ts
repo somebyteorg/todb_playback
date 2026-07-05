@@ -2,6 +2,10 @@ export type VideoType = 'movie' | 'tv'
 
 export type MarkerType = 'intro' | 'credits' | 'recap' | 'advertisement' | 'chapter' | 'post_credits' | 'intermission' | 'preview'
 
+export type ExternalPlatform = 'tencent' | 'youku' | 'iqiyi'
+
+export type ExternalRelationType = 'video_list' | 'video_season' | 'video_episode'
+
 export interface Paginated<T> {
   page: number
   page_size: number
@@ -46,6 +50,14 @@ export interface VideoDetail {
   is_can_edit: boolean
 }
 
+export interface PlaybackVideoBase {
+  video_id: number
+  video_type: VideoType
+  video_title: string
+  runtime: number | null
+  date_air: string | null
+}
+
 export interface SeasonItem {
   season_id: number
   season_number: number
@@ -81,6 +93,7 @@ export interface PlaybackVersion {
   video_list_id: number
   video_season_id: number | null
   video_episode_id: number | null
+  platform: string
   name: string
   description: string | null
   runtime: number | null
@@ -167,4 +180,26 @@ export interface SpriteCreatePayload {
 
 export interface SpriteWithImages extends PlaybackSprite {
   images: string[]
+}
+
+export interface PlaybackExternalItem {
+  type: string
+  url: string | null
+  relation_id: number
+  external_value: string | null
+}
+
+export interface ExternalSpiderEpisode {
+  episode_number: number
+  episode_title: string | null
+  runtime: number | null
+  date_air: string | null
+  external_value: string
+}
+
+export interface ExternalSpiderEpisodeAll {
+  title: string | null
+  external_value: string
+  episode_all: string | number | null
+  episodes: ExternalSpiderEpisode[]
 }

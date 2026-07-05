@@ -2,9 +2,10 @@
   import dayjs from 'dayjs'
   import { computed, onMounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { CalendarDays, Clapperboard, Loader2, Tv, X } from '@lucide/vue'
+  import { CalendarDays, Clapperboard, Link2, Loader2, Tv, X } from '@lucide/vue'
   import ClearableInput from '@/components/ClearableInput.vue'
   import EpisodeFilterControls from '@/components/EpisodeFilterControls.vue'
+  import ExternalSyncDialog from '@/components/ExternalSyncDialog.vue'
   import Tooltip from '@/components/Tooltip.vue'
   import VersionListPanel from '@/components/VersionListPanel.vue'
   import { useSignStore } from '@/stores/sign'
@@ -35,6 +36,8 @@
   const creatingCustomVersion = ref(false)
   const autoEntering = ref(false)
   const showCreateDialog = ref(false)
+  const showExternalSyncDialog = ref(false)
+  const externalSyncMode = ref<'movie' | 'tv'>('movie')
   const customVersionName = ref('')
   const onlyShowVersionedEpisodes = ref(false)
   const onlyShowReleasedEpisodes = ref(true)
@@ -50,6 +53,14 @@
     return detail.value.video_type === 'movie' || Boolean(selectedEpisode.value)
   })
   const showVersionDock = computed(() => detail.value?.video_type === 'tv' && versionDockOpen.value && contextReady.value)
+  const externalSyncRelationId = computed(() => (externalSyncMode.value === 'tv' ? selectedSeasonId.value : (detail.value?.video_id ?? null)))
+  const externalSyncTitle = computed(() => {
+    if (externalSyncMode.value === 'tv') {
+      return [detail.value?.video_title, selectedSeason.value?.season_title].filter(Boolean).join(' · ')
+    }
+
+    return detail.value?.video_title ?? ''
+  })
   const versionPanelDescription = computed(() => {
     if (selectedEpisode.value) {
       return `第 ${selectedEpisode.value.episode_number} 集 · ${selectedEpisode.value.episode_title}`
@@ -220,6 +231,7 @@
         video_list_id: detail.value.video_id,
         video_season_id: detail.value.video_type === 'tv' ? selectedSeasonId.value : null,
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
+        platform: 'user',
         name: '默认',
         description: null,
         runtime,
@@ -232,6 +244,25 @@
   function openCreateDialog() {
     customVersionName.value = ''
     showCreateDialog.value = true
+  }
+
+  function openMovieExternalSync() {
+    externalSyncMode.value = 'movie'
+    showExternalSyncDialog.value = true
+  }
+
+  function openSeasonExternalSync() {
+    if (!selectedSeason.value) {
+      toast.push('请先选择季', 'error')
+      return
+    }
+
+    externalSyncMode.value = 'tv'
+    showExternalSyncDialog.value = true
+  }
+
+  function closeExternalSyncDialog() {
+    showExternalSyncDialog.value = false
   }
 
   async function createCustomVersion() {
@@ -263,6 +294,7 @@
         video_list_id: detail.value.video_id,
         video_season_id: detail.value.video_type === 'tv' ? selectedSeasonId.value : null,
         video_episode_id: detail.value.video_type === 'tv' ? selectedEpisodeId.value : null,
+        platform: 'user',
         name,
         description: null,
         runtime,
@@ -355,9 +387,15 @@
       <div class="relative z-10 mx-auto max-w-6xl space-y-6 px-5 md:px-8" :class="detail.video_type === 'tv' ? 'py-2 md:py-3' : 'py-5 md:py-6'">
         <section v-if="detail.video_type === 'tv'" class="grid gap-5 lg:grid-cols-[280px_1fr] lg:items-start">
           <div class="panel p-4 lg:sticky lg:top-6 lg:self-start">
-            <div class="mb-4 flex items-center gap-2 font-semibold text-ink">
-              <Tv :size="18" />
-              选择季
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div class="flex min-h-9 items-center gap-2 font-semibold text-ink">
+                <Tv :size="18" />
+                选择季
+              </div>
+              <button v-if="sign.isSignedIn" type="button" class="btn-secondary min-h-9 px-3 py-1.5 text-xs" :disabled="!selectedSeason || episodeLoading" @click="openSeasonExternalSync">
+                <Link2 :size="15" />
+                同步外部信息
+              </button>
             </div>
             <div v-if="seasonLoading" class="grid h-32 place-items-center text-ink/55">
               <Loader2 :size="24" class="animate-spin" />
@@ -438,9 +476,11 @@
           :versions="versions"
           :loading="versionLoading"
           :can-create="sign.isSignedIn"
+          :can-sync-external="sign.isSignedIn"
           :creating-default="creatingVersion"
           @create-default="enterDefaultVersion"
           @create-custom="openCreateDialog"
+          @sync-external="openMovieExternalSync"
           @enter="enterWorkspace"
           @sign-in="ToSign"
         />
@@ -467,6 +507,16 @@
         </section>
       </Transition>
     </Teleport>
+
+    <ExternalSyncDialog
+      :open="showExternalSyncDialog"
+      :mode="externalSyncMode"
+      :relation-id="externalSyncRelationId"
+      :title="externalSyncTitle"
+      :episodes="externalSyncMode === 'tv' ? episodes : []"
+      @close="closeExternalSyncDialog"
+      @saved="closeExternalSyncDialog"
+    />
 
     <Teleport to="body">
       <Transition name="fade">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { computed } from 'vue'
-  import { Loader2, LogIn, Play, Plus, X } from '@lucide/vue'
+  import { Link2, Loader2, LogIn, Play, Plus, X } from '@lucide/vue'
   import { formatDuration } from '@/utils/format'
   import type { PlaybackVersion } from '@/types/api'
 
@@ -14,27 +14,28 @@
       canCreate: boolean
       canClose?: boolean
       creatingDefault?: boolean
+      canSyncExternal?: boolean
     }>(),
     {
       mode: 'inline',
       title: '版本列表',
       canClose: false,
       creatingDefault: false,
+      canSyncExternal: false,
     },
   )
 
   const emit = defineEmits<{
     createDefault: []
     createCustom: []
+    syncExternal: []
     close: []
     enter: [version: PlaybackVersion]
     signIn: []
   }>()
 
   const hasVersions = computed(() => props.versions.length > 0)
-  const rootClass = computed(() =>
-    props.mode === 'dock' ? 'mx-auto max-w-6xl rounded-3xl border border-line bg-panel/95 p-4 shadow-soft backdrop-blur-xl md:p-5' : 'panel p-5',
-  )
+  const rootClass = computed(() => (props.mode === 'dock' ? 'mx-auto max-w-6xl rounded-3xl border border-line bg-panel/95 p-4 shadow-soft backdrop-blur-xl md:p-5' : 'panel p-5'))
   const loadingClass = computed(() => (props.mode === 'dock' ? 'grid h-24 place-items-center text-ink/55' : 'grid h-32 place-items-center text-ink/55'))
   const titleClass = computed(() => (props.mode === 'dock' ? 'text-lg font-semibold text-ink md:text-xl' : 'text-xl font-semibold text-ink'))
   const emptyClass = computed(() =>
@@ -54,6 +55,10 @@
         <p class="mt-1 line-clamp-1 text-sm text-ink/60">{{ description }}</p>
       </div>
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <button v-if="canSyncExternal" type="button" class="btn-secondary" :disabled="loading" @click="emit('syncExternal')">
+          <Link2 :size="17" />
+          同步外部信息
+        </button>
         <button v-if="canCreate && !hasVersions" type="button" class="btn-primary" :disabled="creatingDefault || loading" @click="emit('createDefault')">
           <Loader2 v-if="creatingDefault" :size="17" class="animate-spin" />
           <Plus v-else :size="17" />

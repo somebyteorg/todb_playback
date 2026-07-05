@@ -1,22 +1,34 @@
 <script setup lang="ts">
   import { ref, watch } from 'vue'
-  import { Loader2, Save, Trash2 } from '@lucide/vue'
+  import { Loader2, RefreshCw, Save, Trash2 } from '@lucide/vue'
   import ClearableInput from '@/components/ClearableInput.vue'
   import TimeShortcutInput from '@/components/TimeShortcutInput.vue'
+  import Tooltip from '@/components/Tooltip.vue'
   import { useConfirmStore } from '@/stores/confirm'
   import { useToastStore } from '@/stores/toast'
   import { deleteVersion, updateVersion } from '@/utils/playback'
   import { formatDuration } from '@/utils/format'
   import type { PlaybackVersion } from '@/types/api'
 
-  const props = defineProps<{
-    version: PlaybackVersion
-    canEdit: boolean
-  }>()
+  const props = withDefaults(
+    defineProps<{
+      version: PlaybackVersion
+      canEdit: boolean
+      canDelete?: boolean
+      canSyncExternal?: boolean
+      syncingExternal?: boolean
+    }>(),
+    {
+      canDelete: false,
+      canSyncExternal: false,
+      syncingExternal: false,
+    },
+  )
 
   const emit = defineEmits<{
     updated: []
     deleted: []
+    syncExternal: []
   }>()
 
   const confirm = useConfirmStore()
@@ -88,7 +100,7 @@
   }
 
   async function remove() {
-    if (!props.canEdit) return
+    if (!props.canDelete) return
     const ok = await confirm.ask({
       title: '删除播放版本',
       message: `确认将删除当前版本: ${props.version.name}`,
@@ -105,6 +117,24 @@
 <template>
   <section class="space-y-5">
     <div class="panel p-5">
+      <div
+        v-if="!canEdit"
+        class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100"
+      >
+        <p class="min-w-0">当前版本来自外部平台，版本信息不可在工作台编辑。</p>
+        <Tooltip v-if="canSyncExternal" text="同步版本外部信息" placement="bottom">
+          <button
+            type="button"
+            class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-amber-900 transition hover:bg-amber-200/70 hover:text-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/15 dark:text-amber-100 dark:hover:bg-amber-300/15"
+            :disabled="syncingExternal"
+            aria-label="同步版本外部信息"
+            @click="emit('syncExternal')"
+          >
+            <Loader2 v-if="syncingExternal" :size="16" class="animate-spin" />
+            <RefreshCw v-else :size="16" />
+          </button>
+        </Tooltip>
+      </div>
       <div class="grid gap-4 md:grid-cols-3">
         <ClearableInput v-model="form.name" label="版本名" placeholder="默认" :disabled="!canEdit" />
         <div>
@@ -122,12 +152,12 @@
         </div>
       </div>
 
-      <div v-if="canEdit" class="mt-5 flex flex-wrap justify-end gap-3">
-        <button type="button" class="btn-danger" @click="remove">
+      <div v-if="canEdit || canDelete" class="mt-5 flex flex-wrap justify-end gap-3">
+        <button v-if="canDelete" type="button" class="btn-danger" @click="remove">
           <Trash2 :size="16" />
           删除版本
         </button>
-        <button type="button" class="btn-primary" :disabled="saving" @click="save">
+        <button v-if="canEdit" type="button" class="btn-primary" :disabled="saving" @click="save">
           <Loader2 v-if="saving" :size="17" class="animate-spin" />
           <Save v-else :size="17" />
           更新版本信息

@@ -37,6 +37,10 @@
     emit('updateEnd', value)
     emit('commitEnd')
   }
+
+  function isRequiredRangeType(type: MarkerType) {
+    return type === 'intro' || type === 'credits'
+  }
 </script>
 
 <template>
@@ -81,10 +85,21 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <div class="mb-1.5 flex items-center justify-between gap-2 text-sm font-medium">
-          <span class="text-ink/75">开始秒</span>
+          <span class="text-ink/75">
+            开始秒
+            <span v-if="isRequiredRangeType(marker.marker_type)" class="text-rose-500">*</span>
+          </span>
           <span class="shrink-0 font-mono text-xs text-ink/50">{{ startClock }}</span>
         </div>
-        <ClearableInput :model-value="marker.time_start" type="number" :min="0" :max="duration" :disabled="!canEdit" @update:model-value="emit('updateStart', $event)" />
+        <ClearableInput
+          :model-value="marker.time_start"
+          type="number"
+          :min="0"
+          :max="duration"
+          :disabled="!canEdit"
+          :clearable="!isRequiredRangeType(marker.marker_type)"
+          @update:model-value="emit('updateStart', $event)"
+        />
         <div class="mt-2">
           <TimeShortcutInput
             :model-value="marker.time_start"
@@ -100,10 +115,22 @@
       </div>
       <div v-if="isRangeMarker(marker.marker_type)">
         <div class="mb-1.5 flex items-center justify-between gap-2 text-sm font-medium">
-          <span class="text-ink/75">结束秒</span>
+          <span class="text-ink/75">
+            结束秒
+            <span v-if="isRequiredRangeType(marker.marker_type)" class="text-rose-500">*</span>
+          </span>
           <span class="shrink-0 font-mono text-xs text-ink/50">{{ endClock }}</span>
         </div>
-        <ClearableInput :model-value="endValue" type="number" :min="0" :max="duration" :disabled="!canEdit" @update:model-value="emit('updateEnd', $event)" @blur="emit('commitEnd')" />
+        <ClearableInput
+          :model-value="endValue"
+          type="number"
+          :min="0"
+          :max="duration"
+          :disabled="!canEdit"
+          :clearable="!isRequiredRangeType(marker.marker_type)"
+          @update:model-value="emit('updateEnd', $event)"
+          @blur="emit('commitEnd')"
+        />
         <div class="mt-2">
           <TimeShortcutInput
             :model-value="marker.time_end"

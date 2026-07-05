@@ -2,14 +2,19 @@ import { apiDeleteVoid, apiJson, apiPostJson, apiPostVoid, apiPutVoid, apiUpload
 import type {
   EpisodeDetail,
   EpisodeItem,
+  ExternalPlatform,
+  ExternalRelationType,
+  ExternalSpiderEpisodeAll,
   MarkerType,
   MarkerUpdateItem,
   Paginated,
   PlaybackAssetUploadResult,
+  PlaybackExternalItem,
   PlaybackKey,
   PlaybackMarker,
   PlaybackSprite,
   PlaybackVersion,
+  PlaybackVideoBase,
   PlaybackVideoFilters,
   PlaybackVideoListItem,
   SeasonItem,
@@ -33,6 +38,10 @@ export function listPlaybackVideos(filters: PlaybackVideoFilters) {
 
 export function getVideoDetail(videoId: number) {
   return apiJson<VideoDetail>(`api/video/${videoId}`)
+}
+
+export function getPlaybackVideoBase(videoId: number) {
+  return apiJson<PlaybackVideoBase>(`api/playback/video/${videoId}/base`)
 }
 
 export function listSeasons(videoId: number) {
@@ -151,4 +160,45 @@ export function createPlaybackKey(remark: string | null) {
 
 export function deletePlaybackKey(keyId: number) {
   return apiDeleteVoid(`api/playback/key/${keyId}`)
+}
+
+export function listExternalRelations(relationType: ExternalRelationType, relationIds: number[]) {
+  const searchParams = new URLSearchParams()
+
+  searchParams.set('relation_type', relationType)
+  relationIds.forEach((relationId) => {
+    searchParams.append('relation_ids[]', String(relationId))
+  })
+
+  return apiJson<PlaybackExternalItem[]>(`api/playback/external`, {
+    searchParams,
+  })
+}
+
+export function spiderExternalEpisodes(type: ExternalPlatform, url: string, signal?: AbortSignal) {
+  return apiJson<ExternalSpiderEpisodeAll>(`api/playback/external/spider/episodeAll`, {
+    searchParams: cleanSearchParams({ type, url }),
+    signal,
+    timeout: false,
+  })
+}
+
+export function updateExternalVideo(payload: { type: ExternalPlatform; url: string; video_list_id: number }) {
+  return apiPostVoid(`api/playback/external/spider/updateVideo`, payload)
+}
+
+export function updateExternalEpisodes(payload: {
+  type: ExternalPlatform
+  video_season_id: number
+  season_external_value: string
+  episodes: Array<{
+    video_episode_id: number
+    external_value: string | null
+  }>
+}) {
+  return apiPostVoid(`api/playback/external/spider/updateEpisode`, payload)
+}
+
+export function syncExternalVersion(payload: { type: string; relation_type: Extract<ExternalRelationType, 'video_list' | 'video_episode'>; relation_id: number }) {
+  return apiPostVoid(`api/playback/external/spider/sync`, payload)
 }

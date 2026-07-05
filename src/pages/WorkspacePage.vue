@@ -8,20 +8,22 @@
   import Tooltip from '@/components/Tooltip.vue'
   import VersionPanel from '@/components/VersionPanel.vue'
   import { useSignStore } from '@/stores/sign'
-  import { getEpisodeDetail, getVideoDetail, listSprites, listVersions } from '@/utils/playback'
+  import { useToastStore } from '@/stores/toast'
+  import { getEpisodeDetail, getPlaybackVideoBase, listSprites, listVersions, syncExternalVersion } from '@/utils/playback'
   import { formatDate, formatDuration, videoTypeLabel } from '@/utils/format'
-  import type { EpisodeDetail, PlaybackVersion, SpriteWithImages, VideoDetail } from '@/types/api'
+  import type { EpisodeDetail, ExternalRelationType, PlaybackVersion, PlaybackVideoBase, SpriteWithImages } from '@/types/api'
 
   type WorkspaceTab = 'timeline' | 'sprites'
 
   const route = useRoute()
   const router = useRouter()
   const sign = useSignStore()
+  const toast = useToastStore()
   const videoId = computed(() => Number(route.params.videoId))
   const versionId = computed(() => Number(route.params.versionId))
   const seasonNumber = computed(() => routeNumber(route.query.season_number))
   const episodeNumber = computed(() => routeNumber(route.query.episode_number))
-  const detail = ref<VideoDetail | null>(null)
+  const detail = ref<PlaybackVideoBase | null>(null)
   const episode = ref<EpisodeDetail | null>(null)
   const version = ref<PlaybackVersion | null>(null)
   const sprites = ref<SpriteWithImages[]>([])
@@ -29,6 +31,7 @@
   const spritesLoading = ref(false)
   const activeTab = ref<WorkspaceTab>('timeline')
   const showVersionDialog = ref(false)
+  const syncingExternalVersion = ref(false)
 
   const tabs: Array<{ value: WorkspaceTab; label: string; icon: Component }> = [
     { value: 'timeline', label: '时间轴', icon: TimerReset },
@@ -37,6 +40,16 @@
 
   const versionRuntime = computed(() => version.value?.runtime ?? null)
   const versionDurationText = computed(() => formatDuration(versionRuntime.value) || '未设置')
+  const isExternalPlatformVersion = computed(() => Boolean(version.value && version.value.platform !== 'user'))
+  const canEditWorkspace = computed(() => sign.isSignedIn && version.value?.platform === 'user')
+  const canDeleteVersion = computed(() => sign.isSignedIn)
+  const canSyncExternalVersion = computed(() => sign.isSignedIn && isExternalPlatformVersion.value)
+  const externalSyncRelationType = computed<Extract<ExternalRelationType, 'video_list' | 'video_episode'>>(() => (detail.value?.video_type === 'tv' ? 'video_episode' : 'video_list'))
+  const externalSyncRelationId = computed(() => {
+    if (!detail.value || !version.value) return null
+    if (detail.value.video_type === 'tv') return version.value.video_episode_id ?? episode.value?.episode_id ?? null
+    return version.value.video_list_id || detail.value.video_id
+  })
   const episodeCode = computed(() => {
     if (!episode.value || seasonNumber.value === null) return ''
     return `S${padEpisodeCodePart(seasonNumber.value)}E${padEpisodeCodePart(episode.value.episode_number)}`
@@ -82,6 +95,7 @@
       video_list_id: videoId.value,
       video_season_id: episode.value?.season_id ?? null,
       video_episode_id: episode.value?.episode_id ?? null,
+      platform: 'user',
       name: `#${versionId.value}`,
       description: null,
       runtime: null,
@@ -108,7 +122,7 @@
     loading.value = true
 
     try {
-      detail.value = await getVideoDetail(videoId.value)
+      detail.value = await getPlaybackVideoBase(videoId.value)
       if (detail.value.video_type === 'tv') {
         if (seasonNumber.value === null || episodeNumber.value === null) {
           await router.replace({
@@ -155,6 +169,29 @@
     if (!sign.isSignedIn) return
 
     showVersionDialog.value = true
+  }
+
+  async function submitExternalVersionSync() {
+    if (!version.value || !canSyncExternalVersion.value || syncingExternalVersion.value) return
+
+    const relationId = externalSyncRelationId.value
+    if (!relationId) {
+      toast.push('缺少关联 ID，无法同步版本信息', 'error')
+      return
+    }
+
+    syncingExternalVersion.value = true
+
+    try {
+      await syncExternalVersion({
+        type: version.value.platform,
+        relation_type: externalSyncRelationType.value,
+        relation_id: relationId,
+      })
+      toast.push('外部信息已保存，系统正在自动同步版本信息，预计约 3 分钟完成。', 'success')
+    } finally {
+      syncingExternalVersion.value = false
+    }
   }
 
   async function onVersionDeleted() {
@@ -219,7 +256,7 @@
                       v-if="sign.isSignedIn"
                       type="button"
                       class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink/60 transition hover:bg-muted hover:text-ink focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      aria-label="编辑版本"
+                      aria-label="版本操作"
                       @click.stop="openVersionDialog"
                     >
                       <Pencil :size="16" />
@@ -232,7 +269,7 @@
                     v-if="sign.isSignedIn"
                     type="button"
                     class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink/60 transition hover:bg-muted hover:text-ink focus:outline-none focus:ring-4 focus:ring-primary/15"
-                    aria-label="编辑版本"
+                    aria-label="版本操作"
                     @click="openVersionDialog"
                   >
                     <Pencil :size="16" />
@@ -259,13 +296,13 @@
           </button>
         </div>
 
-        <TimelineEditor v-if="activeTab === 'timeline'" :version-id="version.version_id" :duration="versionRuntime" :can-edit="sign.isSignedIn" :sprites="sprites" :video-type="detail.video_type" />
+        <TimelineEditor v-if="activeTab === 'timeline'" :version-id="version.version_id" :duration="versionRuntime" :can-edit="canEditWorkspace" :sprites="sprites" :video-type="detail.video_type" />
 
         <SpritePanel
           v-if="activeTab === 'sprites'"
           :version-id="version.version_id"
           :duration="versionRuntime"
-          :can-edit="sign.isSignedIn"
+          :can-edit="canEditWorkspace"
           :sprites="sprites"
           :loading="spritesLoading"
           @refresh="loadSprites"
@@ -285,7 +322,16 @@
                   <X :size="17" />
                 </button>
               </div>
-              <VersionPanel :version="version" :can-edit="sign.isSignedIn" @updated="onVersionUpdated" @deleted="onVersionDeleted" />
+              <VersionPanel
+                :version="version"
+                :can-edit="canEditWorkspace"
+                :can-delete="canDeleteVersion"
+                :can-sync-external="canSyncExternalVersion"
+                :syncing-external="syncingExternalVersion"
+                @sync-external="submitExternalVersionSync"
+                @updated="onVersionUpdated"
+                @deleted="onVersionDeleted"
+              />
             </section>
           </div>
         </Transition>

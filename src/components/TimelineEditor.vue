@@ -982,11 +982,35 @@
     }
   }
 
+  function isRequiredRangeType(type: MarkerType) {
+    return type === 'intro' || type === 'credits'
+  }
+
   function markerInterval(marker: TimelineMarker) {
     const start = marker.time_start
     const end = isRangeMarker(marker.marker_type) ? Math.max(start + 1, marker.time_end ?? start + 1) : start + 1
 
     return { start, end }
+  }
+
+  function requiredRangeError(marker: TimelineMarker) {
+    if (!isRequiredRangeType(marker.marker_type)) return ''
+
+    const label = markerTypeLabel(marker.marker_type)
+    if (!Number.isFinite(marker.time_start)) return `${label}的开始时间为必填`
+    if (typeof marker.time_end !== 'number' || !Number.isFinite(marker.time_end)) return `${label}的结束时间为必填`
+    if (marker.time_end <= marker.time_start) return `${label}的结束时间必须大于开始时间`
+
+    return ''
+  }
+
+  function validateRequiredRangeMarkers() {
+    const invalidMarker = markers.value.find((marker) => requiredRangeError(marker))
+    if (!invalidMarker) return true
+
+    toast.push(requiredRangeError(invalidMarker), 'error')
+    selectMarker(invalidMarker)
+    return false
   }
 
   function intervalsOverlap(first: { start: number; end: number }, second: { start: number; end: number }) {
@@ -1210,10 +1234,34 @@
     if (!activeMarker.value) return
     activeMarker.value.marker_type = type
     ensureTypeFilterVisible(type)
+
     if (!isRangeMarker(type)) {
       activeMarker.value.time_end = null
       activeEndDraft.value = null
-    } else if (activeMarker.value.time_end === null) {
+      return
+    }
+
+    if (type === 'intro') {
+      const range = defaultRangeForType(type)
+      activeMarker.value.time_start = range.start
+      if (activeMarker.value.time_end === null || activeMarker.value.time_end <= activeMarker.value.time_start) {
+        activeMarker.value.time_end = Math.max(activeMarker.value.time_start + 1, range.end)
+      }
+      activeEndDraft.value = activeMarker.value.time_end
+      return
+    }
+
+    if (type === 'credits') {
+      const range = defaultRangeForType(type)
+      activeMarker.value.time_end = range.end
+      if (activeMarker.value.time_start >= activeMarker.value.time_end) {
+        activeMarker.value.time_start = range.start
+      }
+      activeEndDraft.value = activeMarker.value.time_end
+      return
+    }
+
+    if (activeMarker.value.time_end === null) {
       activeMarker.value.time_end = Math.min(safeDuration.value, activeMarker.value.time_start + 60)
       activeEndDraft.value = activeMarker.value.time_end
     }
@@ -1342,6 +1390,7 @@
 
   async function saveMarkers() {
     if (!props.canEdit || saving.value || !hasChanges.value) return
+    if (!validateRequiredRangeMarkers()) return
 
     saving.value = true
 

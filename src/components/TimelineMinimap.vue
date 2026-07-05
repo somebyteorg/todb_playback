@@ -22,7 +22,7 @@
   }>()
 
   const rootRef = ref<HTMLElement | null>(null)
-  const drag = ref<{ pointerId: number; startX: number; startScrollLeft: number; trackWidth: number } | null>(null)
+  const drag = ref<{ pointerId: number; startX: number; startScrollLeft: number; viewportTravelWidth: number } | null>(null)
 
   const maxScrollLeft = computed(() => Math.max(0, props.scrollWidth - props.clientWidth))
   const viewportStyle = computed(() => {
@@ -38,6 +38,17 @@
 
   function clampScroll(value: number) {
     return Math.min(maxScrollLeft.value, Math.max(0, value))
+  }
+
+  function renderedViewportWidth(trackWidth: number) {
+    const total = Math.max(1, props.scrollWidth)
+    const widthRatio = Math.min(1, Math.max(0.08, props.clientWidth / total))
+
+    return trackWidth * widthRatio
+  }
+
+  function viewportTravelWidth(trackWidth: number) {
+    return Math.max(1, trackWidth - renderedViewportWidth(trackWidth))
   }
 
   function trackRatio(event: PointerEvent) {
@@ -66,13 +77,13 @@
       pointerId: event.pointerId,
       startX: event.clientX,
       startScrollLeft: onViewport ? props.scrollLeft : clampScroll(props.scrollWidth * trackRatio(event) - props.clientWidth / 2),
-      trackWidth: Math.max(1, root.getBoundingClientRect().width),
+      viewportTravelWidth: viewportTravelWidth(Math.max(1, root.getBoundingClientRect().width)),
     }
   }
 
   function moveDrag(event: PointerEvent) {
     if (!drag.value || drag.value.pointerId !== event.pointerId) return
-    const deltaRatio = (event.clientX - drag.value.startX) / drag.value.trackWidth
+    const deltaRatio = (event.clientX - drag.value.startX) / drag.value.viewportTravelWidth
     const nextLeft = clampScroll(drag.value.startScrollLeft + deltaRatio * maxScrollLeft.value)
     emit('scrollTo', nextLeft)
   }
