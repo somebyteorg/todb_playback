@@ -1,127 +1,195 @@
 <script setup lang="ts">
-  import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import { computed, ref } from 'vue'
   import { useClipboard } from '@vueuse/core'
-  import { CheckCircle2, Copy, ExternalLink, KeyRound, Workflow } from '@lucide/vue'
+  import { CheckCircle2, Copy, ExternalLink, FileJson, KeyRound } from '@lucide/vue'
   import DocsCodeBlock from '@/components/DocsCodeBlock.vue'
   import Tooltip from '@/components/Tooltip.vue'
-  import { endpoints, playbackApiBaseUrl, playbackPostmanUrl, quickStartCode, statusCodes, workflowSteps } from '@/data/playbackApiDocs'
   import { useToastStore } from '@/stores/toast'
+  import { markerTypeOptions } from '@/utils/format'
 
-  const docsNavId = 'docs-nav'
-  const navTargets = [
+  const playbackApiBaseUrl = 'https://playback.theotherdb.org/api'
+  const playbackPostmanUrl = 'https://www.postman.com/somebyteorg/todb'
+
+  function prettyJson(value: unknown) {
+    return JSON.stringify(value, null, 2)
+  }
+
+  const quickStartCode = `curl -X POST '${playbackApiBaseUrl}/metadata' \\
+  -H 'Content-Type: application/json' \\
+  -d '${prettyJson({
+    platform_type: 'tmdb_id_movie',
+    platform_value: '83533',
+  })}'`
+
+  const endpoint = {
+    id: 'endpoint-1-3',
+    number: '1.3',
+    title: '获取视频元数据',
+    path: '/metadata',
+    description: '获取可播放版本以及元数据。',
+  }
+
+  const videoExamples = [
     {
-      id: docsNavId,
-      title: '接口文档',
+      id: 'movie',
+      title: '电影',
+      description: '通过 TMDB  ID 查询电影元数据。',
+      requestCode: prettyJson({
+        platform_type: 'tmdb_id_movie',
+        platform_value: '83533',
+        includes: ['marker', 'sprite'],
+        page: 1,
+        page_size: 1,
+      }),
+      responseStatus: '200 OK',
+      responseCode: prettyJson({
+        page: 1,
+        page_size: 1,
+        has_more: false,
+        items: [
+          {
+            version_id: 100,
+            version_name: '优酷',
+            version_description: null,
+            version_runtime: 11369,
+            version_platform: 'youku',
+            todbv_id: 100,
+            video_type: 'movie',
+            base_video_list: {
+              video_type: 'movie',
+              video_title: '阿凡达：火与烬',
+            },
+            base_video_season: null,
+            base_video_episode: null,
+            marker: [
+              {
+                marker_id: 106,
+                marker_type: 'chapter',
+                title: '杰克收集枪支誓报仇，遭罗娜尔出言训斥',
+                time_start: 389,
+                time_end: null,
+                user_avatar_url: 'https://playback.local/avatar.jpg',
+                user_nickname: 'soa',
+              },
+            ],
+            sprite: [
+              {
+                sprite_id: 105,
+                width: 352,
+                height: 198,
+                vtt_url: 'https://playback.local/movie.vtt?v=260701',
+              },
+            ],
+          },
+        ],
+      }),
     },
-    ...endpoints.map((endpoint) => ({
-      id: endpoint.id,
-      title: `${endpoint.number} ${endpoint.title}`,
-    })),
+    {
+      id: 'tv',
+      title: '电视',
+      description: '通过 TMDB ID 查询电视元数据。',
+      requestCode: prettyJson({
+        platform_type: 'tmdb_id_tv',
+        platform_value: '226045',
+        season_number: 1,
+        episode_number: 1,
+        includes: ['base_video_list', 'base_video_season', 'base_video_episode', 'marker', 'sprite'],
+        page: 1,
+        page_size: 1,
+      }),
+      responseStatus: '200 OK',
+      responseCode: prettyJson({
+        page: 1,
+        page_size: 1,
+        has_more: true,
+        items: [
+          {
+            version_id: 101,
+            version_name: '爱奇艺',
+            version_description: null,
+            version_runtime: 1300,
+            version_platform: 'iqiyi',
+            todbv_id: 102,
+            video_type: 'tv',
+            base_video_list: {
+              video_type: 'tv',
+              video_title: '大主宰',
+            },
+            base_video_season: {
+              season_number: 1,
+              season_title: '第 1 季',
+              date_air: '2023-06-30',
+            },
+            base_video_episode: {
+              episode_number: 1,
+              episode_title: '逐出灵路',
+            },
+            marker: [
+              {
+                marker_id: 104,
+                marker_type: 'intro',
+                title: null,
+                time_start: 0,
+                time_end: 27,
+                user_avatar_url: null,
+                user_nickname: null,
+              },
+            ],
+            sprite: [
+              {
+                sprite_id: 103,
+                width: 400,
+                height: 225,
+                vtt_url: 'https://playback.local/tv.vtt?v=260701',
+              },
+            ],
+          },
+        ],
+      }),
+    },
   ]
+  const activeExampleId = ref(videoExamples[0]?.id ?? '')
+  const activeVideoExample = computed(() => videoExamples.find((example) => example.id === activeExampleId.value) ?? videoExamples[0])
+
+  const params = [
+    {
+      name: 'platform_type',
+      type: 'string|null',
+      description: '第三方平台类型，与 platform_value 配套使用。',
+      values: [
+        { value: 'tmdb_id_tv', label: 'TMDB 剧集' },
+        { value: 'tmdb_id_movie', label: 'TMDB 电影' },
+      ],
+    },
+    { name: 'platform_value', type: 'string|null', description: '第三方平台内容 ID。' },
+    { name: 'version_id', type: 'number|null', description: '版本 ID，可直接定位某个播放版本。' },
+    { name: 'todbv_id', type: 'number|null', description: 'TODB 视频 ID。' },
+    { name: 'season_number', type: 'number|null', description: '电视季数。' },
+    { name: 'episode_number', type: 'number|null', description: '电视集数。' },
+    {
+      name: 'includes',
+      type: 'string[]|null',
+      description: '需要包含那些数据。',
+      values: [
+        { value: 'base_video_list', label: '视频基础信息' },
+        { value: 'base_video_season', label: '季信息' },
+        { value: 'base_video_episode', label: '集信息' },
+        { value: 'marker', label: '时间轴标记', detail: '响应中有概率时间重叠' },
+        { value: 'sprite', label: '雪碧图规则' },
+      ],
+    },
+    { name: 'page', type: 'number|null', description: '页码，从 1 开始。' },
+    { name: 'page_size', type: 'number|null', description: '每页条数，范围 1 到 30。' },
+  ]
+
+  const markerTypeValues = markerTypeOptions.map(({ value, label }) => ({ value, label }))
+  const notes = ['page_size 每页条数范围为 1 到 30。']
 
   const toast = useToastStore()
   const { copy } = useClipboard()
-  const activeNavId = ref(docsNavId)
-  const docsNavBar = ref<HTMLElement | null>(null)
-  const docsNavElement = ref<HTMLElement | null>(null)
-  const endpointElements = new Map<string, HTMLElement>()
-  const navLinkElements = new Map<string, HTMLElement>()
-  let scrollSpyFrame = 0
-  let scrollSpyLockedUntil = 0
-  let unlockTimer = 0
 
   function endpointUrl(path: string) {
     return `${playbackApiBaseUrl}${path}`
-  }
-
-  function targetElement(anchorId: string) {
-    return anchorId === docsNavId ? docsNavElement.value : (endpointElements.get(anchorId) ?? document.getElementById(anchorId))
-  }
-
-  function setEndpointRef(endpointId: string, element: unknown) {
-    if (element instanceof HTMLElement) {
-      endpointElements.set(endpointId, element)
-      return
-    }
-
-    endpointElements.delete(endpointId)
-  }
-
-  function setNavLinkRef(anchorId: string, element: unknown) {
-    if (element instanceof HTMLElement) {
-      navLinkElements.set(anchorId, element)
-      return
-    }
-
-    navLinkElements.delete(anchorId)
-  }
-
-  function currentAnchorOffset() {
-    if (window.innerWidth < 768) return 24
-    return (docsNavBar.value?.offsetHeight ?? 0) + 18
-  }
-
-  function documentTop(element: HTMLElement) {
-    return window.scrollY + element.getBoundingClientRect().top
-  }
-
-  function scrollToTarget(target: HTMLElement | null | undefined, behavior: ScrollBehavior) {
-    if (!target) return
-
-    const top = documentTop(target) - currentAnchorOffset()
-    window.scrollTo({
-      top: Math.max(0, top),
-      behavior,
-    })
-  }
-
-  function navigateToAnchor(anchorId: string) {
-    const target = targetElement(anchorId)
-
-    activeNavId.value = anchorId
-
-    scrollSpyLockedUntil = Date.now() + 950
-    if (unlockTimer) window.clearTimeout(unlockTimer)
-    unlockTimer = window.setTimeout(() => {
-      scrollSpyLockedUntil = 0
-      queueScrollSpyUpdate()
-    }, 980)
-
-    scrollToTarget(target, 'smooth')
-  }
-
-  function updateActiveEndpointFromScroll() {
-    scrollSpyFrame = 0
-
-    const probeTop = window.scrollY + currentAnchorOffset() + 2
-    let currentAnchorId = docsNavId
-
-    for (const target of navTargets) {
-      const element = targetElement(target.id)
-      if (!element) continue
-
-      if (documentTop(element) <= probeTop) {
-        currentAnchorId = target.id
-        continue
-      }
-
-      break
-    }
-
-    const reachedPageEnd = Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 4
-    if (reachedPageEnd) {
-      currentAnchorId = navTargets[navTargets.length - 1]?.id ?? docsNavId
-    }
-
-    if (activeNavId.value !== currentAnchorId) {
-      activeNavId.value = currentAnchorId
-    }
-  }
-
-  function queueScrollSpyUpdate() {
-    if (Date.now() < scrollSpyLockedUntil) return
-    if (scrollSpyFrame) return
-    scrollSpyFrame = window.requestAnimationFrame(updateActiveEndpointFromScroll)
   }
 
   async function copyText(value: string, label: string) {
@@ -132,99 +200,39 @@
       toast.push(`${label}复制失败`, 'error')
     }
   }
-
-  function statusCodeClass(code: string) {
-    if (code === '401') return 'border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-200'
-    if (code === '422') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200'
-    return 'border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200'
-  }
-
-  function scrollActiveNavIntoView(anchorId: string) {
-    requestAnimationFrame(() => {
-      navLinkElements.get(anchorId)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'center',
-      })
-    })
-  }
-
-  watch(activeNavId, (anchorId) => {
-    scrollActiveNavIntoView(anchorId)
-  })
-
-  onMounted(async () => {
-    await nextTick()
-    updateActiveEndpointFromScroll()
-    scrollActiveNavIntoView(activeNavId.value)
-    window.addEventListener('scroll', queueScrollSpyUpdate, { passive: true })
-    window.addEventListener('resize', queueScrollSpyUpdate)
-  })
-
-  onBeforeUnmount(() => {
-    if (scrollSpyFrame) window.cancelAnimationFrame(scrollSpyFrame)
-    if (unlockTimer) window.clearTimeout(unlockTimer)
-    window.removeEventListener('scroll', queueScrollSpyUpdate)
-    window.removeEventListener('resize', queueScrollSpyUpdate)
-  })
 </script>
 
 <template>
   <main class="page-shell">
-    <section ref="docsNavBar" class="sticky top-0 z-20 hidden border-b border-line/55 bg-page/88 px-5 backdrop-blur md:block md:px-8 lg:px-12">
-      <div class="mx-auto flex max-w-[96rem] items-center gap-3 py-2.5">
-        <nav class="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="接口文档导航">
-          <button
-            v-for="target in navTargets"
-            :key="target.id"
-            :ref="(element) => setNavLinkRef(target.id, element)"
-            type="button"
-            class="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition"
-            :class="activeNavId === target.id ? 'bg-muted text-primary-strong ring-1 ring-line/70' : 'text-ink/54 hover:bg-muted/70 hover:text-ink'"
-            :aria-current="activeNavId === target.id ? 'location' : undefined"
-            @click="navigateToAnchor(target.id)"
-          >
-            {{ target.title }}
-          </button>
-        </nav>
-
-        <span class="h-6 w-px shrink-0 bg-line" aria-hidden="true" />
-
-        <Tooltip text="打开 Postman 项目文档" placement="bottom">
-          <a
-            :href="playbackPostmanUrl"
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label="Postman 项目文档"
-            class="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-ink/54 transition hover:bg-muted/70 hover:text-primary-strong"
-          >
-            <ExternalLink :size="17" />
-            <span>Postman</span>
-          </a>
-        </Tooltip>
-      </div>
-    </section>
-
-    <section :id="docsNavId" ref="docsNavElement" class="relative isolate scroll-mt-20 border-b border-line bg-[linear-gradient(180deg,var(--page-start),var(--page))] px-5 py-10 md:px-8 lg:px-12">
+    <section class="relative isolate border-b border-line bg-[linear-gradient(180deg,var(--page-start),var(--page))] px-5 py-10 md:px-8 lg:px-12">
       <div
         class="pointer-events-none absolute inset-0 -z-10 opacity-25 [background-image:linear-gradient(rgba(36,48,47,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(36,48,47,.08)_1px,transparent_1px)] [background-size:34px_34px]"
       />
 
       <div class="mx-auto grid max-w-[88rem] gap-6 lg:grid-cols-[minmax(0,48rem)_minmax(24rem,34rem)] lg:items-center">
         <div class="min-w-0 py-5 lg:py-12">
-          <h1 class="mt-6 max-w-4xl text-4xl font-black leading-tight text-ink md:text-6xl">第三方接入文档</h1>
-          <p class="mt-5 max-w-3xl text-base leading-8 text-ink/66 md:text-lg">接口均可匿名调用，不强制携带 Authorization。</p>
+          <h1 class="mt-6 max-w-4xl text-4xl font-black leading-tight text-ink md:text-6xl">MetaData 元数据接口</h1>
+          <p class="mt-5 max-w-3xl text-base leading-8 text-ink/66 md:text-lg">只需一个接口，无需登录即可调用。</p>
 
           <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <RouterLink :to="{ name: 'keys' }" class="btn-primary min-h-12 px-5 text-base">
               <KeyRound :size="18" />
               获取播放密钥
             </RouterLink>
+            <a
+              :href="playbackPostmanUrl"
+              target="_blank"
+              rel="noreferrer noopener"
+              class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-panel px-5 text-base font-black text-ink/68 shadow-sm transition hover:bg-muted hover:text-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/15"
+            >
+              <ExternalLink :size="18" />
+              <span>Postman</span>
+            </a>
           </div>
         </div>
 
         <aside class="min-w-0">
-          <DocsCodeBlock :code="quickStartCode" label="cURL" language="bash" copy-label="示例命令" max-height-class="max-h-72" wrap />
+          <DocsCodeBlock :code="quickStartCode" label="cURL" language="bash" copy-label="示例命令" max-height-class="max-h-80" />
           <div class="mt-3 flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-panel/70 px-4 py-3">
             <span class="shrink-0 text-xs font-black uppercase text-ink/42">Base URL</span>
             <code class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-sm font-bold text-ink">{{ playbackApiBaseUrl }}</code>
@@ -244,189 +252,156 @@
     </section>
 
     <section class="mx-auto max-w-[96rem] px-5 py-8 md:px-8 lg:px-12">
-      <div class="grid gap-8">
-        <section class="rounded-2xl border border-line bg-panel/80 p-5 shadow-sm" aria-label="接入概览">
-          <div class="flex flex-col gap-3">
-            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div class="badge bg-muted">
-                <Workflow :size="16" />
-                推荐路径
+      <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <h2 class="text-2xl font-black text-ink">接口说明</h2>
+        <p class="max-w-2xl text-sm leading-6 text-ink/56">更新时间: 2026-07-05</p>
+      </div>
+
+      <article :id="endpoint.id" class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel shadow-soft">
+        <header class="border-b border-line p-5 md:p-6">
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="flex min-w-0 items-start gap-4">
+              <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-500 text-white shadow-sm">
+                <FileJson :size="24" />
               </div>
-              <p class="min-w-0 text-sm leading-6 text-ink/56 lg:text-right">先解析 ID，再选择版本，最后按 version_id 拉取时间轴和预览图等数据。</p>
+              <div class="min-w-0">
+                <div class="flex min-w-0 items-center gap-3">
+                  <span class="grid h-8 min-w-10 shrink-0 place-items-center rounded-full bg-ink px-3 text-xs font-black text-panel">{{ endpoint.number }}</span>
+                  <h3 class="min-w-0 text-2xl font-black leading-tight text-ink md:text-3xl">{{ endpoint.title }}</h3>
+                </div>
+                <p class="mt-3 max-w-3xl text-sm leading-7 text-ink/62">{{ endpoint.description }}</p>
+              </div>
             </div>
-            <h2 class="text-2xl font-black text-ink">三步接入</h2>
-          </div>
 
-          <ol class="relative mt-6 grid gap-4 lg:grid-cols-3">
-            <li v-for="step in workflowSteps" :key="step.id" class="relative min-w-0 rounded-2xl border border-line bg-muted/38 p-4">
-              <div class="flex items-start gap-4">
-                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-panel text-sm font-black text-primary-strong ring-1 ring-primary/20">{{ step.id }}</div>
-                <div class="min-w-0">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="text-base font-black text-ink">{{ step.title }}</h3>
-                    <code class="rounded-full bg-panel px-2.5 py-1 text-xs font-bold text-ink/48 ring-1 ring-line/70">{{ step.endpoint }}</code>
-                  </div>
-                  <p class="mt-2 text-sm leading-6 text-ink/62">{{ step.detail }}</p>
-                </div>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <section class="grid min-w-0 gap-5" aria-labelledby="endpoint-list-title">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 id="endpoint-list-title" class="text-2xl font-black text-ink">接口详情</h2>
+            <div class="flex min-w-0 shrink-0 items-center gap-2 rounded-xl border border-line bg-muted/55 px-2 py-2">
+              <span class="rounded-lg bg-primary/12 px-2.5 py-1 text-xs font-black text-primary-strong">POST</span>
+              <code class="min-w-0 truncate text-sm font-bold text-ink">{{ endpoint.path }}</code>
+              <Tooltip :text="`复制 ${endpoint.number} 完整请求地址`">
+                <button
+                  type="button"
+                  class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink/52 transition hover:bg-panel hover:text-ink focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  :aria-label="`复制 ${endpoint.number} 完整请求地址`"
+                  @click="copyText(endpointUrl(endpoint.path), `${endpoint.number} 地址`)"
+                >
+                  <Copy :size="14" />
+                </button>
+              </Tooltip>
             </div>
-            <p class="max-w-2xl text-sm leading-6 text-ink/56">更新时间: 2026-07-02</p>
           </div>
+        </header>
 
-          <article
-            v-for="endpoint in endpoints"
-            :id="endpoint.id"
-            :key="endpoint.id"
-            :ref="(element) => setEndpointRef(endpoint.id, element)"
-            class="min-w-0 scroll-mt-28 overflow-hidden rounded-2xl border border-line bg-panel shadow-soft md:scroll-mt-28 lg:scroll-mt-32"
-          >
-            <header class="border-b border-line p-5 md:p-6">
-              <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div class="flex min-w-0 items-start gap-4">
-                  <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-sm" :class="endpoint.accentClass">
-                    <component :is="endpoint.icon" :size="24" />
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex min-w-0 items-center gap-3">
-                      <span class="grid h-8 min-w-10 shrink-0 place-items-center rounded-full bg-ink px-3 text-xs font-black text-panel">{{ endpoint.number }}</span>
-                      <h3 class="min-w-0 text-2xl font-black leading-tight text-ink md:text-3xl">{{ endpoint.title }}</h3>
-                    </div>
-                    <p class="mt-3 max-w-3xl text-sm leading-7 text-ink/62">{{ endpoint.description }}</p>
-                  </div>
-                </div>
+        <div class="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)]">
+          <section class="min-w-0 border-b border-line p-5 md:p-6 lg:border-b-0 lg:border-r">
+            <h4 class="text-sm font-black text-ink">请求字段</h4>
 
-                <div class="flex min-w-0 shrink-0 items-center gap-2 rounded-xl border border-line bg-muted/55 px-2 py-2">
-                  <span class="rounded-lg bg-primary/12 px-2.5 py-1 text-xs font-black text-primary-strong">POST</span>
-                  <code class="min-w-0 truncate text-sm font-bold text-ink">{{ endpoint.path }}</code>
-                  <Tooltip :text="`复制 ${endpoint.number} 完整请求地址`">
-                    <button
-                      type="button"
-                      class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink/52 transition hover:bg-panel hover:text-ink focus:outline-none focus:ring-4 focus:ring-primary/15"
-                      :aria-label="`复制 ${endpoint.number} 完整请求地址`"
-                      @click="copyText(endpointUrl(endpoint.path), `${endpoint.number} 地址`)"
-                    >
-                      <Copy :size="14" />
-                    </button>
-                  </Tooltip>
-                </div>
-              </div>
-            </header>
-
-            <div class="grid min-w-0 gap-0 xl:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)]">
-              <div class="min-w-0 border-b border-line p-5 md:p-6 xl:border-b-0 xl:border-r">
-                <h4 class="text-sm font-black text-ink">请求参数</h4>
-
-                <div v-if="endpoint.params.length" class="mt-4 max-w-full overflow-x-auto rounded-2xl border border-line">
-                  <table class="w-full min-w-[42rem] border-collapse text-left text-sm md:min-w-full">
-                    <thead class="bg-muted text-xs font-black text-ink/52">
-                      <tr>
-                        <th scope="col" class="w-[9.5rem] px-3 py-2">字段</th>
-                        <th scope="col" class="w-[9rem] px-3 py-2">类型</th>
-                        <th scope="col" class="px-3 py-2">说明</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="param in endpoint.params" :key="`${endpoint.id}-${param.name}`" class="border-t border-line align-top">
-                        <th scope="row" class="px-3 py-3 text-left">
-                          <code class="break-all font-bold text-ink">{{ param.name }}</code>
-                        </th>
-                        <td class="px-3 py-3">
-                          <code class="break-all text-ink/56">{{ param.type }}</code>
-                        </td>
-                        <td class="px-3 py-3">
-                          <p class="leading-6 text-ink/62">{{ param.description }}</p>
-                          <div v-if="param.values?.length" class="mt-2 grid gap-1.5">
-                            <div
-                              v-for="value in param.values"
-                              :key="`${endpoint.id}-${param.name}-${value.value}`"
-                              class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted/65 px-2.5 py-2"
-                            >
-                              <code class="break-all text-xs font-black text-primary-strong">{{ value.value }}</code>
-                              <span class="text-xs font-semibold text-ink/58">{{ value.label }}</span>
-                              <span v-if="value.detail" class="text-xs leading-5 text-ink/45">{{ value.detail }}</span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div v-else class="empty-box mt-4 py-6">无需请求 Body。</div>
-
-                <div v-if="endpoint.responseEnums?.length" class="mt-5 border-t border-line pt-5">
-                  <div v-for="responseEnum in endpoint.responseEnums" :key="`${endpoint.id}-${responseEnum.field}`" class="min-w-0">
-                    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h5 class="text-sm font-black text-ink">响应字段取值</h5>
-                        <p class="mt-1 text-sm leading-6 text-ink/56">{{ responseEnum.description }}</p>
+            <div v-if="params.length" class="mt-4 max-w-full overflow-x-auto rounded-2xl border border-line">
+              <table class="w-full min-w-[42rem] border-collapse text-left text-sm md:min-w-full">
+                <thead class="bg-muted text-xs font-black text-ink/52">
+                  <tr>
+                    <th scope="col" class="w-[9.5rem] px-3 py-2">字段</th>
+                    <th scope="col" class="w-[9rem] px-3 py-2">类型</th>
+                    <th scope="col" class="px-3 py-2">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="param in params" :key="param.name" class="border-t border-line align-top">
+                    <th scope="row" class="px-3 py-3 text-left">
+                      <code class="break-all font-bold text-ink">{{ param.name }}</code>
+                    </th>
+                    <td class="px-3 py-3">
+                      <code class="break-all text-ink/56">{{ param.type }}</code>
+                    </td>
+                    <td class="px-3 py-3">
+                      <p class="leading-6 text-ink/62">{{ param.description }}</p>
+                      <div v-if="param.values?.length" class="mt-2 grid gap-1.5">
+                        <div v-for="value in param.values" :key="`${param.name}-${value.value}`" class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted/65 px-2.5 py-2">
+                          <code class="break-all text-xs font-black text-primary-strong">{{ value.value }}</code>
+                          <span class="text-xs font-semibold text-ink/58">{{ value.label }}</span>
+                          <span v-if="value.detail" class="text-xs leading-5 text-ink/45">{{ value.detail }}</span>
+                        </div>
                       </div>
-                      <code class="w-fit rounded-full bg-muted px-2.5 py-1 text-xs font-black text-primary-strong">{{ responseEnum.path }}</code>
-                    </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                      <div v-for="value in responseEnum.values" :key="`${endpoint.id}-${responseEnum.field}-${value.value}`" class="min-w-0 rounded-xl border border-line bg-muted/45 px-3 py-2">
-                        <code class="block break-all text-xs font-black text-ink">{{ value.value }}</code>
-                        <span class="mt-1 block text-sm font-semibold text-ink/56">{{ value.label }}</span>
-                      </div>
-                    </div>
-                  </div>
+            <div class="mt-5 border-t border-line pt-5">
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h5 class="text-sm font-black text-ink">响应字段取值</h5>
+                  <p class="mt-1 text-sm leading-6 text-ink/56">marker_type 标识时间轴标记的用途。</p>
                 </div>
-
-                <div class="mt-5 grid gap-2">
-                  <div v-for="note in endpoint.notes" :key="note" class="flex gap-2 text-sm leading-6 text-ink/62">
-                    <CheckCircle2 :size="17" class="mt-0.5 shrink-0 text-primary" />
-                    <span>{{ note }}</span>
-                  </div>
-                </div>
+                <code class="w-fit rounded-full bg-muted px-2.5 py-1 text-xs font-black text-primary-strong">items[].marker[].marker_type</code>
               </div>
 
-              <div class="grid min-w-0 gap-5 p-5 md:p-6">
-                <DocsCodeBlock :code="endpoint.requestCode" label="Request JSON" language="json" :copy-label="`${endpoint.number} 请求示例`" max-height-class="max-h-80" />
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <div v-for="value in markerTypeValues" :key="value.value" class="min-w-0 rounded-xl border border-line bg-muted/45 px-3 py-2">
+                  <code class="block break-all text-xs font-black text-ink">{{ value.value }}</code>
+                  <span class="mt-1 block text-sm font-semibold text-ink/56">{{ value.label }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-2">
+              <div v-for="note in notes" :key="note" class="flex gap-2 text-sm leading-6 text-ink/62">
+                <CheckCircle2 :size="17" class="mt-0.5 shrink-0 text-primary" />
+                <span>{{ note }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid min-w-0 gap-5 p-5 md:p-6" aria-label="示例">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h4 class="text-sm font-black text-ink">请求示例</h4>
+                <p class="mt-1 text-sm leading-6 text-ink/56">以下为精简字段，具体以postman为准。</p>
+              </div>
+            </div>
+
+            <div class="min-w-0 overflow-x-auto rounded-2xl border border-line bg-muted/35 p-1" role="tablist" aria-label="示例场景">
+              <div class="grid min-w-[14rem] grid-cols-2 gap-1">
+                <button
+                  v-for="example in videoExamples"
+                  :id="`example-tab-${example.id}`"
+                  :key="example.id"
+                  type="button"
+                  role="tab"
+                  class="min-h-10 rounded-xl px-3 text-sm font-black transition focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  :class="activeExampleId === example.id ? 'bg-panel text-primary-strong shadow-sm ring-1 ring-line/70' : 'text-ink/54 hover:bg-panel/70 hover:text-ink'"
+                  :aria-selected="activeExampleId === example.id"
+                  :aria-controls="`example-panel-${example.id}`"
+                  @click="activeExampleId = example.id"
+                >
+                  {{ example.title }}
+                </button>
+              </div>
+            </div>
+
+            <section v-if="activeVideoExample" :id="`example-panel-${activeVideoExample.id}`" class="min-w-0" role="tabpanel" :aria-labelledby="`example-tab-${activeVideoExample.id}`">
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 class="text-sm font-black text-ink">{{ activeVideoExample.title }}</h4>
+                  <p class="mt-1 text-sm leading-6 text-ink/56">{{ activeVideoExample.description }}</p>
+                </div>
+                <code class="w-fit rounded-full bg-muted px-2.5 py-1 text-xs font-black text-primary-strong">{{ activeVideoExample.responseStatus }}</code>
+              </div>
+
+              <div class="mt-4 grid min-w-0 gap-4">
+                <DocsCodeBlock :code="activeVideoExample.requestCode" label="Request JSON" language="json" :copy-label="`${activeVideoExample.title}请求示例`" max-height-class="max-h-none" />
                 <DocsCodeBlock
-                  :code="endpoint.responseCode"
+                  :code="activeVideoExample.responseCode"
                   label="Response JSON"
                   language="json"
-                  :status="endpoint.responseStatus"
-                  :copy-label="`${endpoint.number} 响应示例`"
-                  max-height-class="max-h-96"
+                  :status="activeVideoExample.responseStatus"
+                  :copy-label="`${activeVideoExample.title}响应示例`"
+                  max-height-class="max-h-none"
                 />
               </div>
-            </div>
-          </article>
-        </section>
-
-        <section class="rounded-2xl border border-line bg-panel/80 p-5 shadow-sm" aria-labelledby="status-code-title">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div class="badge bg-muted">
-                <CheckCircle2 :size="16" />
-                错误处理
-              </div>
-              <h2 id="status-code-title" class="mt-3 text-2xl font-black text-ink">状态码</h2>
-            </div>
-            <p class="max-w-xl text-sm leading-6 text-ink/56">均为 HTTP 响应状态码</p>
-          </div>
-
-          <div class="mt-5 grid gap-3 md:grid-cols-3">
-            <article v-for="status in statusCodes" :key="status.code" class="rounded-2xl border border-line bg-muted/35 p-4">
-              <div class="flex items-center gap-2">
-                <code class="rounded-full border px-2.5 py-1 text-xs font-black" :class="statusCodeClass(status.code)">{{ status.code }}</code>
-                <h3 class="text-sm font-black text-ink">{{ status.title }}</h3>
-              </div>
-              <p class="mt-3 text-sm leading-6 text-ink/62">{{ status.detail }}</p>
-              <code v-if="status.example" class="mt-3 block max-w-full overflow-x-auto rounded-xl bg-panel/70 px-3 py-2 text-xs font-semibold text-ink/70">{{ status.example }}</code>
-            </article>
-          </div>
-        </section>
-      </div>
+            </section>
+          </section>
+        </div>
+      </article>
     </section>
   </main>
 </template>
