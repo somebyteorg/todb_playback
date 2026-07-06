@@ -115,7 +115,8 @@ export interface PlaybackMarker {
 export interface PlaybackSprite {
   sprite_id: number
   sprite_name: string
-  interval: number
+  interval: number | null
+  frame_times: number[]
   width: number
   height: number
   columns: number

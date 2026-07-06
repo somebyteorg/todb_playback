@@ -264,9 +264,37 @@
     return `${sprite.sprite_id}#${sprite.sprite_name}`
   }
 
+  function spriteFrameForFrameTimes(sprite: SpriteWithImages, time: number) {
+    const frameTimes = sprite.frame_times
+    const frameCount = Math.max(1, sprite.count_frame)
+    if (frameTimes.length === 0) return 0
+
+    const maxIndex = Math.min(frameCount, frameTimes.length) - 1
+    const normalizedTime = clampTime(time)
+    if (normalizedTime <= frameTimes[0]) return 0
+
+    let left = 0
+    let right = maxIndex
+
+    while (left <= right) {
+      const middle = Math.floor((left + right) / 2)
+      if (frameTimes[middle] <= normalizedTime) {
+        left = middle + 1
+      } else {
+        right = middle - 1
+      }
+    }
+
+    return Math.min(maxIndex, Math.max(0, right))
+  }
+
   function spriteFrameForTime(sprite: SpriteWithImages, time: number) {
     const frameCount = Math.max(1, sprite.count_frame)
-    return Math.min(frameCount - 1, Math.max(0, Math.floor(clampTime(time) / Math.max(1, sprite.interval))))
+    if (sprite.interval !== null && Number.isFinite(sprite.interval) && sprite.interval > 0) {
+      return Math.min(frameCount - 1, Math.max(0, Math.floor(clampTime(time) / sprite.interval)))
+    }
+
+    return spriteFrameForFrameTimes(sprite, time)
   }
 
   function thumbnailForSpriteTime(sprite: SpriteWithImages, time: number): TimelineThumbnailPreviewData | null {
@@ -765,7 +793,7 @@
 
   function findPinnedThumbnailForPreview(thumbnail: TimelineThumbnailPreviewData, time: number) {
     const sprite = previewSprites.value.find((item) => item.sprite_id === thumbnail.spriteId)
-    const maxDistance = Math.max(1, sprite?.interval ?? 1)
+    const maxDistance = sprite?.interval ? Math.max(1, sprite.interval) : Number.POSITIVE_INFINITY
 
     return (
       pinnedThumbnails.value

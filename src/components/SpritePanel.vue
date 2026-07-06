@@ -49,6 +49,10 @@
     return sprite.user_nickname || '用户头像'
   }
 
+  function spriteTimingLabel(sprite: SpriteWithImages) {
+    return sprite.interval ? `${sprite.interval}s` : `时间点 ${sprite.frame_times.length} 个`
+  }
+
   async function openSpriteViewer(sprite: SpriteWithImages) {
     if (previewLoadingSpriteId.value !== null) return
 
@@ -154,7 +158,7 @@
       <article v-for="sprite in sprites" :key="sprite.sprite_id" class="flex flex-col gap-4 border-b border-line px-4 py-4 last:border-b-0 md:flex-row md:items-center md:justify-between">
         <div class="min-w-0 flex-1 space-y-2">
           <h3 class="break-words font-semibold text-ink">{{ sprite.sprite_id }} # {{ sprite.sprite_name }}</h3>
-          <p class="mt-1 text-sm text-ink/60">{{ sprite.interval }}s / {{ sprite.width }}x{{ sprite.height }} / {{ sprite.columns }}x{{ sprite.rows }} / {{ sprite.count_frame }} 帧</p>
+          <p class="mt-1 text-sm text-ink/60">{{ spriteTimingLabel(sprite) }} / {{ sprite.width }}x{{ sprite.height }} / {{ sprite.columns }}x{{ sprite.rows }} / {{ sprite.count_frame }} 帧</p>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-ink/55">
             <span v-if="hasUploaderInfo(sprite)" class="inline-flex items-center gap-1.5">
               <img v-if="sprite.user_avatar" :src="sprite.user_avatar" :alt="userAvatarAlt(sprite)" class="h-6 w-6 rounded-full border border-line object-cover" />
