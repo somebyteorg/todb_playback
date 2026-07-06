@@ -736,7 +736,6 @@
   function matchReason(episode: EpisodeItem) {
     const code = matchReasonCode(episode)
 
-    if (code === 'delete') return '将清除当前关联'
     if (code === 'unmatched') return '需要人工处理'
     if (code === 'none') return existingEpisodeExternalValue(episode.episode_id) ? '手动清除关联' : '未关联'
     if (code === 'existing') return '保留已有匹配'
@@ -871,7 +870,7 @@
                 </div>
               </div>
 
-              <div v-if="episodes.length === 0" class="empty-box">当前季暂无本地剧集，无法建立关联。</div>
+              <div v-if="props.episodes.length === 0" class="empty-box">当前季暂无本地剧集，无法建立关联。</div>
               <div v-else-if="visibleEpisodes.length === 0" class="empty-box">当前筛选下没有剧集。</div>
 
               <div v-else class="rounded-2xl border border-line">
