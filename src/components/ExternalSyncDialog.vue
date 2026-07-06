@@ -8,14 +8,22 @@
   import Tooltip from '@/components/Tooltip.vue'
   import { useConfirmStore } from '@/stores/confirm'
   import { useToastStore } from '@/stores/toast'
+  import {
+    buildExternalEpisodeMatches,
+    canAutoSaveExternalEpisodeMatch,
+    countEpisodeDates,
+    describeExternalEpisodeMatch,
+    episodeCanKeepExistingMatch,
+    externalEpisodeMatchRiskReasons,
+  } from '@/utils/externalEpisodeMatch'
   import { formatDate, formatDuration } from '@/utils/format'
   import { listExternalRelations, spiderExternalEpisodes, updateExternalEpisodes, updateExternalVideo } from '@/utils/playback'
-  import type { EpisodeItem, ExternalPlatform, ExternalRelationType, ExternalSpiderEpisode, ExternalSpiderEpisodeAll, PlaybackExternalItem } from '@/types/api'
+  import type { EpisodeItem, ExternalPlatform, ExternalRelationType, ExternalSpiderEpisodeAll, PlaybackExternalItem } from '@/types/api'
+  import type { EpisodeMatchSource, ExternalEpisodeMatchState } from '@/utils/externalEpisodeMatch'
 
   type SyncMode = 'movie' | 'tv'
-  type EpisodeChangeAction = 'none' | 'create' | 'update' | 'delete'
-  type EpisodeMatchSource = 'existing' | 'date' | 'number' | 'manual' | 'unmatched'
-  type EpisodeReviewFilter = 'all' | 'needs_review' | 'risk' | 'date' | 'number' | 'date_mismatch' | 'delete'
+  type EpisodeChangeAction = 'none' | 'create' | 'update' | 'delete' | 'resync'
+  type EpisodeReviewFilter = 'all' | 'needs_review' | 'risk' | 'date' | 'number' | 'missing_external' | 'mismatch' | 'delete'
 
   const props = withDefaults(
     defineProps<{
@@ -62,7 +70,8 @@
     { value: 'risk', label: '高风险' },
     { value: 'date', label: '日期匹配' },
     { value: 'number', label: '集数匹配' },
-    { value: 'date_mismatch', label: '日期不一致' },
+    { value: 'missing_external', label: '外部值缺失' },
+    { value: 'mismatch', label: '匹配异常' },
     { value: 'delete', label: '待删除' },
   ]
 
@@ -110,14 +119,28 @@
   })
   const selectedRelationExternal = computed(() => relationForSelectedPlatform(existingRelations.value, props.relationId))
   const selectedRelationExternalValue = computed(() => selectedRelationExternal.value?.external_value ?? '')
+  const episodeMatchStates = computed<Record<number, ExternalEpisodeMatchState>>(() => {
+    const states: Record<number, ExternalEpisodeMatchState> = {}
+
+    props.episodes.forEach((episode) => {
+      states[episode.episode_id] = describeExternalEpisodeMatch({
+        episode,
+        selectedValue: episodeMatches.value[episode.episode_id] ?? null,
+        source: episodeMatchSources.value[episode.episode_id],
+        externalByValue: externalByValue.value,
+      })
+    })
+
+    return states
+  })
   const changedEpisodePayloads = computed(() =>
     props.episodes
       .map((episode) => {
-        if (episodeHasMissingExternalValue(episode)) return null
+        if (episodeMatchState(episode).hasMissingExternalValue) return null
         const before = existingEpisodeExternalValue(episode.episode_id)
         const after = episodeMatches.value[episode.episode_id] ?? null
 
-        if (before === after) return null
+        if (before === after && !episodeNeedsVersionSyncRetry(episode, before, after)) return null
 
         return {
           video_episode_id: episode.episode_id,
@@ -130,9 +153,7 @@
     changedEpisodePayloads.value.filter((payload) => {
       const episode = props.episodes.find((item) => item.episode_id === payload.video_episode_id)
       if (!episode) return false
-      if (episodeHasMissingExternalValue(episode)) return false
-      const source = episodeMatchSources.value[episode.episode_id]
-      return source === 'date' || source === 'number'
+      return canAutoSaveExternalEpisodeMatch(episodeMatchState(episode))
     }),
   )
   const changedEpisodeCount = computed(() => changedEpisodePayloads.value.length)
@@ -143,7 +164,7 @@
     return [props.mode, props.relationId ?? '', episodeIdsKey.value].join('|')
   })
   const localDateCounts = computed(() => countEpisodeDates(props.episodes))
-  const externalDateCounts = computed(() => countExternalEpisodeDates(spiderEpisodes.value))
+  const externalDateCounts = computed(() => countEpisodeDates(spiderEpisodes.value))
   const episodeSummary = computed(() => {
     let matched = 0
     let autoMatched = 0
@@ -154,10 +175,9 @@
     let risk = 0
 
     props.episodes.forEach((episode) => {
-      const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-      const reasonCode = matchReasonCode(episode)
+      const state = episodeMatchState(episode)
 
-      if (episodeNeedsReview(episode)) {
+      if (state.needsReview) {
         needsReview += 1
       }
 
@@ -165,17 +185,17 @@
         risk += 1
       }
 
-      if (!selectedValue) return
+      if (!state.selectedValue) return
 
       matched += 1
-      if (!externalByValue.value.has(selectedValue)) missingExternal += 1
+      if (state.hasMissingExternalValue) missingExternal += 1
 
-      if (reasonCode === 'date' || reasonCode === 'number') {
+      if (state.reason === 'date' || state.reason === 'number') {
         autoMatched += 1
       }
 
-      if (reasonCode === 'date') dateMatched += 1
-      if (reasonCode === 'number') numberMatched += 1
+      if (state.reason === 'date') dateMatched += 1
+      if (state.reason === 'number') numberMatched += 1
     })
 
     return {
@@ -191,11 +211,12 @@
     }
   })
   const visibleEpisodes = computed(() => {
-    if (reviewFilter.value === 'needs_review') return props.episodes.filter((episode) => episodeNeedsReview(episode))
+    if (reviewFilter.value === 'needs_review') return props.episodes.filter((episode) => episodeMatchState(episode).needsReview)
     if (reviewFilter.value === 'risk') return props.episodes.filter((episode) => episodeHasRisk(episode))
-    if (reviewFilter.value === 'date') return props.episodes.filter((episode) => matchReasonCode(episode) === 'date')
-    if (reviewFilter.value === 'number') return props.episodes.filter((episode) => matchReasonCode(episode) === 'number')
-    if (reviewFilter.value === 'date_mismatch') return props.episodes.filter((episode) => episodeDateMismatch(episode))
+    if (reviewFilter.value === 'date') return props.episodes.filter((episode) => episodeMatchState(episode).reason === 'date')
+    if (reviewFilter.value === 'number') return props.episodes.filter((episode) => episodeMatchState(episode).reason === 'number')
+    if (reviewFilter.value === 'missing_external') return props.episodes.filter((episode) => episodeMatchState(episode).hasMissingExternalValue)
+    if (reviewFilter.value === 'mismatch') return props.episodes.filter((episode) => episodeMatchState(episode).hasMatchMismatch)
     if (reviewFilter.value === 'delete') return props.episodes.filter((episode) => episodeChangeAction(episode) === 'delete')
 
     return props.episodes
@@ -428,83 +449,21 @@
     return relationForSelectedPlatform(existingEpisodeRelations.value, episodeId)?.external_value ?? null
   }
 
-  function countEpisodeDates(episodes: EpisodeItem[]) {
-    const counts: Record<string, number> = {}
-
-    episodes.forEach((episode) => {
-      if (!episode.date_air) return
-      counts[episode.date_air] = (counts[episode.date_air] ?? 0) + 1
-    })
-
-    return counts
-  }
-
-  function countExternalEpisodeDates(episodes: ExternalSpiderEpisode[]) {
-    const counts: Record<string, number> = {}
-
-    episodes.forEach((episode) => {
-      if (!episode.date_air) return
-      counts[episode.date_air] = (counts[episode.date_air] ?? 0) + 1
-    })
-
-    return counts
-  }
-
   function buildInitialEpisodeMatches(result: ExternalSpiderEpisodeAll) {
-    const usedExternalValues = new Set<string>()
-    const nextMatches: Record<number, string | null> = {}
-    const nextSources: Record<number, EpisodeMatchSource> = {}
+    const existingValuesByEpisodeId: Partial<Record<number, string | null>> = {}
 
     props.episodes.forEach((episode) => {
-      const existingValue = existingEpisodeExternalValue(episode.episode_id)
-      nextMatches[episode.episode_id] = null
-      nextSources[episode.episode_id] = 'unmatched'
-
-      if (existingValue) {
-        nextMatches[episode.episode_id] = existingValue
-        nextSources[episode.episode_id] = 'existing'
-        usedExternalValues.add(existingValue)
-      }
+      existingValuesByEpisodeId[episode.episode_id] = existingEpisodeExternalValue(episode.episode_id)
     })
 
-    props.episodes.forEach((episode) => {
-      if (nextMatches[episode.episode_id] || !episode.date_air) return
-      const matchedEpisode = findExternalEpisodeByDate(episode, result.episodes, usedExternalValues)
-      if (!matchedEpisode) return
-
-      nextMatches[episode.episode_id] = matchedEpisode.external_value
-      nextSources[episode.episode_id] = 'date'
-      usedExternalValues.add(matchedEpisode.external_value)
+    const next = buildExternalEpisodeMatches({
+      episodes: props.episodes,
+      externalEpisodes: result.episodes,
+      existingValuesByEpisodeId,
     })
 
-    props.episodes.forEach((episode) => {
-      if (nextMatches[episode.episode_id]) return
-      const matchedEpisode = findExternalEpisodeByNumber(episode, result.episodes, usedExternalValues)
-      if (!matchedEpisode) return
-
-      nextMatches[episode.episode_id] = matchedEpisode.external_value
-      nextSources[episode.episode_id] = 'number'
-      usedExternalValues.add(matchedEpisode.external_value)
-    })
-
-    episodeMatches.value = nextMatches
-    episodeMatchSources.value = nextSources
-  }
-
-  function findExternalEpisodeByDate(episode: EpisodeItem, externalEpisodes: ExternalSpiderEpisode[], usedExternalValues: Set<string>) {
-    const candidates = externalEpisodes.filter((externalEpisode) => !usedExternalValues.has(externalEpisode.external_value))
-    const sameDate = candidates.filter((externalEpisode) => externalEpisode.date_air === episode.date_air)
-    const sameDateAndNumber = sameDate.find((externalEpisode) => externalEpisode.episode_number === episode.episode_number)
-
-    if (sameDateAndNumber) return sameDateAndNumber
-    return sameDate[0] ?? null
-  }
-
-  function findExternalEpisodeByNumber(episode: EpisodeItem, externalEpisodes: ExternalSpiderEpisode[], usedExternalValues: Set<string>) {
-    const candidates = externalEpisodes.filter((externalEpisode) => !usedExternalValues.has(externalEpisode.external_value))
-
-    const sameNumber = candidates.find((externalEpisode) => externalEpisode.episode_number === episode.episode_number)
-    return sameNumber ?? null
+    episodeMatches.value = next.matches
+    episodeMatchSources.value = next.sources
   }
 
   function setEpisodeMatch(episodeId: number, nextValue: string | null) {
@@ -540,8 +499,9 @@
     let count = 0
 
     props.episodes.forEach((episode) => {
-      if (!episodeNeedsReview(episode)) return
-      if (episodeHasMissingExternalValue(episode)) return
+      const state = episodeMatchState(episode)
+      if (!state.needsReview) return
+      if (state.hasMissingExternalValue) return
       nextMatches[episode.episode_id] = null
       nextSources[episode.episode_id] = 'manual'
       count += 1
@@ -618,67 +578,44 @@
   }
 
   function missingSelectedValue(episode: EpisodeItem) {
-    const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-    if (!selectedValue || externalByValue.value.has(selectedValue)) return ''
+    const state = episodeMatchState(episode)
+    if (!state.hasMissingExternalValue || !state.selectedValue) return ''
 
-    return selectedValue
+    return state.selectedValue
   }
 
   function selectedExternalEpisode(episode: EpisodeItem) {
-    const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-    if (!selectedValue) return null
-
-    return externalByValue.value.get(selectedValue) ?? null
+    return episodeMatchState(episode).selectedExternalEpisode
   }
 
-  function episodeNeedsReview(episode: EpisodeItem) {
-    const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-    if (!selectedValue) return episodeMatchSources.value[episode.episode_id] === 'unmatched'
-
-    return !externalByValue.value.has(selectedValue)
+  function episodeMatchState(episode: EpisodeItem) {
+    return (
+      episodeMatchStates.value[episode.episode_id] ??
+      describeExternalEpisodeMatch({
+        episode,
+        selectedValue: episodeMatches.value[episode.episode_id] ?? null,
+        source: episodeMatchSources.value[episode.episode_id],
+        externalByValue: externalByValue.value,
+      })
+    )
   }
 
-  function episodeHasMissingExternalValue(episode: EpisodeItem) {
-    const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-    return Boolean(selectedValue && !externalByValue.value.has(selectedValue))
-  }
+  function episodeNeedsVersionSyncRetry(episode: EpisodeItem, before: string | null, after: string | null) {
+    if (!before || !after || before !== after) return false
+    if (episodeCanKeepExistingMatch(episode)) return false
 
-  function episodeDateMismatch(episode: EpisodeItem) {
-    const externalEpisode = selectedExternalEpisode(episode)
-    return Boolean(episode.date_air && externalEpisode?.date_air && episode.date_air !== externalEpisode.date_air)
+    const source = episodeMatchSources.value[episode.episode_id]
+    return source === 'date' || source === 'number' || source === 'manual'
   }
 
   function episodeRiskReasons(episode: EpisodeItem) {
-    const reasons: string[] = []
-    const externalEpisode = selectedExternalEpisode(episode)
-    const reasonCode = matchReasonCode(episode)
-
-    if (episodeHasMissingExternalValue(episode)) {
-      reasons.push('当前外部值不在平台返回列表中')
-    }
-
-    if (reasonCode === 'number' && episodeDateMismatch(episode)) {
-      reasons.push('按集数匹配但播出日期不一致')
-    }
-
-    if (reasonCode === 'date' && episode.date_air) {
-      const localCount = localDateCounts.value[episode.date_air] ?? 0
-      const externalCount = externalDateCounts.value[episode.date_air] ?? 0
-
-      if (localCount > 1 || externalCount > 1) {
-        reasons.push(`同日期存在多集（本地 ${localCount} / 外部 ${externalCount}）`)
-      }
-    }
-
-    if (externalEpisode && episode.episode_number !== externalEpisode.episode_number && reasonCode === 'date') {
-      reasons.push('按日期匹配但集数不同')
-    }
-
-    if (episodeChangeAction(episode) === 'delete') {
-      reasons.push('保存后会删除当前关联')
-    }
-
-    return reasons
+    return externalEpisodeMatchRiskReasons({
+      episode,
+      state: episodeMatchState(episode),
+      localDateCounts: localDateCounts.value,
+      externalDateCounts: externalDateCounts.value,
+      willDelete: episodeChangeAction(episode) === 'delete',
+    })
   }
 
   function episodeHasRisk(episode: EpisodeItem) {
@@ -715,6 +652,7 @@
     const before = existingEpisodeExternalValue(episode.episode_id)
     const after = episodeMatches.value[episode.episode_id] ?? null
 
+    if (episodeNeedsVersionSyncRetry(episode, before, after)) return 'resync'
     if (before === after) return 'none'
     if (!after) return 'delete'
     if (!before) return 'create'
@@ -725,6 +663,7 @@
     if (action === 'create') return '新增'
     if (action === 'update') return '更新'
     if (action === 'delete') return '删除'
+    if (action === 'resync') return '同步'
     return '不变'
   }
 
@@ -732,24 +671,12 @@
     if (action === 'create') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
     if (action === 'update') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
     if (action === 'delete') return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200'
+    if (action === 'resync') return 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200'
     return 'bg-muted text-ink/55'
   }
 
-  function matchReasonCode(episode: EpisodeItem) {
-    const selectedValue = episodeMatches.value[episode.episode_id] ?? null
-    const source = episodeMatchSources.value[episode.episode_id] ?? 'manual'
-
-    if (!selectedValue) return source === 'unmatched' ? 'unmatched' : 'none'
-    if (!externalByValue.value.has(selectedValue)) return 'missing'
-
-    if (source === 'existing') return 'existing'
-    if (source === 'date') return 'date'
-    if (source === 'number') return 'number'
-    return 'manual'
-  }
-
   function matchReason(episode: EpisodeItem) {
-    const code = matchReasonCode(episode)
+    const code = episodeMatchState(episode).reason
 
     if (code === 'unmatched') return '需要人工处理'
     if (code === 'none') return existingEpisodeExternalValue(episode.episode_id) ? '手动清除关联' : '未关联'
@@ -915,7 +842,7 @@
                         :current-episode-id="episode.episode_id"
                         :assigned-episodes-by-value="assignedEpisodesByValue"
                         :missing-value="missingSelectedValue(episode)"
-                        :disabled="saving || episodeHasMissingExternalValue(episode)"
+                        :disabled="saving || episodeMatchState(episode).hasMissingExternalValue"
                         @update:model-value="setEpisodeMatch(episode.episode_id, $event)"
                       />
                     </div>
