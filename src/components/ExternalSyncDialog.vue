@@ -19,7 +19,7 @@
   import { formatDate, formatDuration } from '@/utils/format'
   import { listExternalRelations, spiderExternalEpisodes, updateExternalEpisodes, updateExternalVideo } from '@/utils/playback'
   import type { EpisodeItem, ExternalPlatform, ExternalRelationType, ExternalSpiderEpisodeAll, PlaybackExternalItem } from '@/types/api'
-  import type { EpisodeMatchSource, ExternalEpisodeMatchState } from '@/utils/externalEpisodeMatch'
+  import type { EpisodeMatchMode, EpisodeMatchSource, ExternalEpisodeMatchPlan, ExternalEpisodeMatchState } from '@/utils/externalEpisodeMatch'
 
   type SyncMode = 'movie' | 'tv'
   type EpisodeChangeAction = 'none' | 'create' | 'update' | 'delete' | 'resync'
@@ -63,6 +63,9 @@
   const episodeMatches = ref<Record<number, string | null>>({})
   const episodeMatchSources = ref<Record<number, EpisodeMatchSource>>({})
   const reviewFilter = ref<EpisodeReviewFilter>('all')
+  const matchMode = ref<EpisodeMatchMode>('auto')
+  const matchOffset = ref(0)
+  const matchPlan = ref<ExternalEpisodeMatchPlan | null>(null)
 
   const reviewFilterOptions: Array<{ value: EpisodeReviewFilter; label: string }> = [
     { value: 'all', label: '全部' },
@@ -73,6 +76,12 @@
     { value: 'missing_external', label: '外部值缺失' },
     { value: 'mismatch', label: '匹配异常' },
     { value: 'delete', label: '待删除' },
+  ]
+  const matchModeOptions: Array<{ value: EpisodeMatchMode; label: string }> = [
+    { value: 'auto', label: '自动' },
+    { value: 'number', label: '集数' },
+    { value: 'date', label: '日期' },
+    { value: 'offset', label: '偏移' },
   ]
 
   let initializeVersion = 0
@@ -119,6 +128,22 @@
   })
   const selectedRelationExternal = computed(() => relationForSelectedPlatform(existingRelations.value, props.relationId))
   const selectedRelationExternalValue = computed(() => selectedRelationExternal.value?.external_value ?? '')
+  const showMatchOffsetInput = computed(() => matchMode.value === 'offset')
+  const matchPlanText = computed(() => {
+    const plan = matchPlan.value
+    if (!plan) return ''
+
+    if (plan.effectiveMode === 'offset' && plan.offset !== null) {
+      return [`平台集数 = 本地集数 ${formatOffset(plan.offset)}`, plan.anchorCount ? `${plan.anchorCount} 个日期锚点` : ''].filter(Boolean).join(' / ')
+    }
+
+    if (plan.effectiveMode === 'number') {
+      return plan.anchorCount ? `普通集数匹配 / ${plan.anchorCount} 个日期锚点` : '普通集数匹配'
+    }
+
+    if (plan.effectiveMode === 'date') return '唯一日期匹配'
+    return '暂无自动匹配'
+  })
   const episodeMatchStates = computed<Record<number, ExternalEpisodeMatchState>>(() => {
     const states: Record<number, ExternalEpisodeMatchState> = {}
 
@@ -190,7 +215,7 @@
       matched += 1
       if (state.hasMissingExternalValue) missingExternal += 1
 
-      if (state.reason === 'date' || state.reason === 'number') {
+      if (state.reason === 'date' || state.reason === 'number' || state.reason === 'offset') {
         autoMatched += 1
       }
 
@@ -289,6 +314,9 @@
     existingRelations.value = []
     existingEpisodeRelations.value = []
     reviewFilter.value = 'all'
+    matchMode.value = 'auto'
+    matchOffset.value = 0
+    matchPlan.value = null
     clearSpiderResult()
   }
 
@@ -296,6 +324,7 @@
     spiderResult.value = null
     episodeMatches.value = {}
     episodeMatchSources.value = {}
+    matchPlan.value = null
     reviewFilter.value = 'all'
   }
 
@@ -460,10 +489,39 @@
       episodes: props.episodes,
       externalEpisodes: result.episodes,
       existingValuesByEpisodeId,
+      mode: matchMode.value,
+      offset: matchOffsetValue(),
     })
 
     episodeMatches.value = next.matches
     episodeMatchSources.value = next.sources
+    matchPlan.value = next.plan
+
+    if (matchMode.value === 'auto' && next.plan.inferredOffset !== null) {
+      matchOffset.value = next.plan.inferredOffset
+    }
+  }
+
+  function matchOffsetValue() {
+    const parsed = Number(matchOffset.value)
+    return Number.isFinite(parsed) ? Math.trunc(parsed) : 0
+  }
+
+  function formatOffset(offset: number) {
+    if (offset === 0) return '+0'
+    return offset > 0 ? `+${offset}` : String(offset)
+  }
+
+  function setMatchMode(mode: EpisodeMatchMode) {
+    matchMode.value = mode
+
+    if (mode === 'offset' && matchPlan.value?.inferredOffset !== null && matchPlan.value?.inferredOffset !== undefined) {
+      matchOffset.value = matchPlan.value.inferredOffset
+    }
+
+    if (spiderResult.value) {
+      buildInitialEpisodeMatches(spiderResult.value)
+    }
   }
 
   function setEpisodeMatch(episodeId: number, nextValue: string | null) {
@@ -490,7 +548,7 @@
     if (!spiderResult.value) return
 
     buildInitialEpisodeMatches(spiderResult.value)
-    toast.push('已重置为自动匹配结果', 'success')
+    toast.push('已重新匹配剧集', 'success')
   }
 
   function clearUnmatchedEpisodes() {
@@ -684,6 +742,7 @@
     if (code === 'missing') return '保留当前值'
     if (code === 'date') return '按日期匹配'
     if (code === 'number') return '按集数匹配'
+    if (code === 'offset') return '偏移匹配'
     return '手动关联'
   }
 </script>
@@ -769,11 +828,39 @@
                   </div>
                   <div class="flex flex-wrap gap-2">
                     <button type="button" class="btn-secondary min-h-9 px-3 py-1.5 text-xs" :disabled="saving" @click="clearUnmatchedEpisodes">清空需处理</button>
-                    <button type="button" class="btn-secondary min-h-9 px-3 py-1.5 text-xs" :disabled="saving" @click="resetAutoMatches">重置自动匹配</button>
                     <button type="button" class="btn-secondary min-h-9 px-3 py-1.5 text-xs" :disabled="saving || autoChangedEpisodePayloads.length === 0" @click="saveEpisodeMatches('auto')">
                       保存自动匹配
                     </button>
                   </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 border-t border-line pt-3">
+                  <div class="inline-flex min-h-8 overflow-hidden rounded-xl border border-line bg-muted">
+                    <button
+                      v-for="option in matchModeOptions"
+                      :key="option.value"
+                      type="button"
+                      class="px-3 py-1 text-xs font-semibold text-ink/58 transition hover:text-primary-strong"
+                      :class="matchMode === option.value ? 'bg-panel text-primary-strong shadow-sm' : ''"
+                      :disabled="saving"
+                      @click="setMatchMode(option.value)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  </div>
+                  <label v-if="showMatchOffsetInput" class="inline-flex min-h-8 items-center gap-2 rounded-xl border border-line bg-panel px-2 text-xs text-ink/58">
+                    <span class="font-semibold">偏移</span>
+                    <input
+                      v-model.number="matchOffset"
+                      type="number"
+                      class="h-6 w-16 rounded-lg border border-line bg-muted px-2 text-center font-semibold text-ink outline-none focus:border-primary/60"
+                      :disabled="saving"
+                    />
+                  </label>
+                  <button type="button" class="btn-secondary min-h-8 px-3 py-1 text-xs" :disabled="saving" @click="resetAutoMatches">
+                    <RefreshCw :size="14" />
+                    重新匹配
+                  </button>
+                  <span v-if="matchPlanText" class="min-w-0 text-xs text-ink/45">{{ matchPlanText }}</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <button
