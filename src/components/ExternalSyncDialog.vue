@@ -41,6 +41,7 @@
     { value: 'tencent', label: '腾讯' },
     { value: 'youku', label: '优酷' },
     { value: 'iqiyi', label: '爱奇艺' },
+    { value: 'bilibili', label: 'B站' },
   ]
 
   const selectedPlatform = ref<ExternalPlatform>('tencent')
@@ -72,9 +73,23 @@
   const relationType = computed<ExternalRelationType>(() => (props.mode === 'tv' ? 'video_season' : 'video_list'))
   const dialogTitle = computed(() => (props.mode === 'tv' ? '同步季外部信息' : '同步电影外部信息'))
   const platformUrlPlaceholder = computed(() => {
-    if (selectedPlatform.value === 'youku') return 'https://v.youku.com/v_show/[x].html'
-    if (selectedPlatform.value === 'iqiyi') return 'https://www.iqiyi.com/[x].html'
-    return 'https://v.qq.com/x/cover/[x]/[x].html'
+    switch (selectedPlatform.value) {
+      case 'tencent':
+        return 'https://v.qq.com/x/cover/[x]/[x].html'
+        break
+      case 'youku':
+        return 'https://v.youku.com/v_show/[x].html'
+        break
+      case 'iqiyi':
+        return 'https://www.iqiyi.com/[x].html'
+        break
+      case 'bilibili':
+        return 'https://www.bilibili.com/bangumi/media/[x].html'
+        break
+      default:
+        return 'https://'
+        break
+    }
   })
   const spiderEpisodes = computed(() => spiderResult.value?.episodes ?? [])
   const externalByValue = computed(() => new Map(spiderEpisodes.value.map((episode) => [episode.external_value, episode])))
