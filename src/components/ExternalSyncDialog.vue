@@ -50,6 +50,7 @@
     { value: 'youku', label: '优酷' },
     { value: 'iqiyi', label: '爱奇艺' },
     { value: 'bilibili', label: 'B站' },
+    { value: 'mgtv', label: '芒果TV' },
   ]
 
   const selectedPlatform = ref<ExternalPlatform>('tencent')
@@ -103,6 +104,9 @@
         break
       case 'bilibili':
         return 'https://www.bilibili.com/bangumi/media/[x].html'
+        break
+      case 'mgtv':
+        return 'https://www.mgtv.com/b/[x]/[x].html'
         break
       default:
         return 'https://'

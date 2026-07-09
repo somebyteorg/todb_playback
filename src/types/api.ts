@@ -2,7 +2,7 @@ export type VideoType = 'movie' | 'tv'
 
 export type MarkerType = 'intro' | 'credits' | 'recap' | 'advertisement' | 'chapter' | 'post_credits' | 'intermission' | 'preview'
 
-export type ExternalPlatform = 'tencent' | 'youku' | 'iqiyi' | 'bilibili'
+export type ExternalPlatform = 'tencent' | 'youku' | 'iqiyi' | 'bilibili' | 'mgtv'
 
 export type ExternalRelationType = 'video_list' | 'video_season' | 'video_episode'
 
