@@ -4,7 +4,7 @@ import signStore from '@/stores/sign'
 export { ky }
 
 const instance = ky.create({
-  prefixUrl: '/',
+  prefixUrl: import.meta.env.PROD ? 'https://theotherdb.org/' : '/',
   timeout: 1000 * 30,
   retry: 0,
   hooks: {
