@@ -114,5 +114,5 @@ export async function apiUpload<T>(path: string, body: FormData) {
 }
 
 export const ToSign = () => {
-  window.location.href = '/api/sign?state=playback'
+  window.location.href = 'https://theotherdb.org/api/sign?state=playback'
 }
